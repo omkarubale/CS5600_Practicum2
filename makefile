@@ -1,7 +1,13 @@
-all: server client
+all: ./server/server ./client/client
+	echo "MAKE: Building all"
 
 server: ./server/server.c
-	gcc -Wall ./server/server.c -o ./server/server
+	echo "MAKE: Building Server"
+	gcc ./server/server.c -o ./server/server
 
 client: ./client/client.c
-	gcc -Wall ./client/client.c -o ./client/client
+	echo "MAKE: Building Client"
+	gcc ./client/client.c -o ./client/client
+
+clean:
+	rm -f ./server/server ./client/client
