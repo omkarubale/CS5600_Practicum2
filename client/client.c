@@ -15,7 +15,7 @@
 
 int socket_desc;
 struct sockaddr_in server_addr;
-char server_message[SERVER_MESSAGE_SIZE], client_message[CLIENT_MESSAGE_SIZE];
+char server_message[ERROR_CODE_SIZE + ERROR_CODE_PADDING + SERVER_MESSAGE_SIZE], client_message[ERROR_CODE_SIZE + ERROR_CODE_PADDING + CLIENT_MESSAGE_SIZE];
 
 void client_closeClientSocket()
 {
@@ -91,6 +91,26 @@ void client_recieveResponse()
   }
 
   printf("Server's response: %s\n", server_message);
+}
+
+void command_get(char *remote_file_path, char *local_file_path)
+{
+}
+
+void command_info(char *remote_file_path)
+{
+}
+
+void command_makeDirectory(char *folder_path)
+{
+}
+
+void command_put(char *local_file_path, char *remote_file_path)
+{
+}
+
+void command_remove(char *path)
+{
 }
 
 int main(void)
