@@ -3,8 +3,8 @@
 
 #pragma region Error and Success Codes
 
-#define ERROR_CODE_SIZE 5
-#define ERROR_CODE_PADDING 1
+#define CODE_SIZE 5
+#define CODE_PADDING 1
 
 // Error codes
 #define ERROR_NOT_FOUND "E:404"
@@ -14,6 +14,12 @@
 #define SUCCESS_OK "S:200"
 #define SUCCESS_CONTINUE "S:100"
 #define SUCCESS_PARTIAL_CONTENT "S:206"
+
+#define COMMAND_CODE_GET "C:001"
+#define COMMAND_CODE_INFO "C:002"
+#define COMMAND_CODE_PUT "C:003"
+#define COMMAND_CODE_MD "C:004"
+#define COMMAND_CODE_RM "C:005"
 
 #pragma endregion Error and Success Codes
 
@@ -26,6 +32,7 @@
 
 // client config
 #define CLIENT_MESSAGE_SIZE 2000
+#define CLIENT_COMMAND_SIZE 200
 
 #pragma endregion Config
 

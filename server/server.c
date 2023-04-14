@@ -16,7 +16,8 @@
 int socket_desc, client_sock;
 socklen_t client_size;
 struct sockaddr_in server_addr, client_addr;
-char server_message[ERROR_CODE_SIZE + ERROR_CODE_PADDING + SERVER_MESSAGE_SIZE], client_message[ERROR_CODE_SIZE + ERROR_CODE_PADDING + CLIENT_MESSAGE_SIZE];
+char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE], client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+char client_command[CLIENT_COMMAND_SIZE];
 
 void server_closeServerSocket()
 {
@@ -65,6 +66,62 @@ void initServer()
   init_bindServerSocket();
 }
 
+void server_respond(char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE])
+{
+  strcpy(server_message, "This is the server's response message.");
+
+  if (send(client_sock, server_message, strlen(server_message), 0) < 0)
+  {
+    printf("ERROR: Can't send\n");
+    server_closeServerSocket();
+  }
+}
+
+void command_get(char *remote_file_path, char *local_file_path)
+{
+  printf("COMMAND: GET started\n");
+
+  // TODO
+
+  printf("COMMAND: GET complete\n");
+}
+
+void command_info(char *remote_file_path)
+{
+  printf("COMMAND: INFO started\n");
+
+  // TODO
+
+  printf("COMMAND: INFO complete\n");
+}
+
+void command_makeDirectory(char *folder_path)
+{
+  printf("COMMAND: MD started\n");
+
+  // TODO
+
+  printf("COMMAND: MD complete\n");
+}
+
+void command_put(char *local_file_path, char *remote_file_path)
+{
+  printf("COMMAND: PUT started\n");
+
+  // TODO
+
+  printf("COMMAND: PUT complete\n");
+}
+
+void command_remove(char *path)
+{
+  printf("COMMAND: RM started\n");
+
+  // TODO
+
+  printf("COMMAND: RM complete\n");
+}
+
 void server_listenForClients()
 {
   if (listen(socket_desc, 1) < 0)
@@ -86,45 +143,108 @@ void server_listenForClients()
   printf("Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 }
 
-void server_recieveMessage()
+void server_listenForCommand()
 {
-  if (recv(client_sock, client_message, sizeof(client_message), 0) < 0)
+  while (true)
   {
-    printf("ERROR: Couldn't receive\n");
-    server_closeServerSocket();
+    memset(client_command, 0, sizeof(client_command));
+    if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
+    {
+      printf("ERROR: Couldn't receive\n");
+      server_closeServerSocket();
+    }
+
+    printf("Msg from client: %s\n", client_command);
+
+    // Interpret entered command
+    char *pch;
+    pch = strtok(client_command, " ");
+
+    char *args[3];
+
+    args[0] = pch;
+    pch = strtok(NULL, " ");
+
+    // Set arguement Limits based on first argument
+    int argcLimit;
+    int argc = 1;
+
+    if (strcmp(args[0], "C:001") == 0)
+    {
+      argcLimit = 3;
+    }
+    else if (strcmp(args[0], "C:002") == 0)
+    {
+      argcLimit = 2;
+    }
+    else if (strcmp(args[0], "C:003") == 0)
+    {
+      argcLimit = 3;
+    }
+    else if (strcmp(args[0], "C:004") == 0)
+    {
+      argcLimit = 2;
+    }
+    else if (strcmp(args[0], "C:005") == 0)
+    {
+      argcLimit = 2;
+    }
+    else if (strcmp(args[0], "C:999") == 0)
+    {
+      argcLimit = 1;
+    }
+    else
+    {
+      printf("ERROR: Invalid command provided\n");
+      server_respond("E:404 Invalid command");
+      continue;
+    }
+
+    // Parse remaining arguements based on set command
+
+    while (pch != NULL)
+    {
+      if (argc >= argcLimit)
+      {
+        printf("ERROR: Invalid number of arguements provided\n");
+        // continue;
+      }
+
+      args[argc++] = pch;
+      pch = strtok(NULL, " ");
+    }
+
+    // Redirect to correct command
+    if (strcmp(args[0], "C:001") == 0)
+    {
+      command_get(args[1], args[2]);
+    }
+    else if (strcmp(args[0], "C:002") == 0)
+    {
+      command_info(args[1]);
+    }
+    else if (strcmp(args[0], "C:003") == 0)
+    {
+      command_put(args[1], args[2]);
+    }
+    else if (strcmp(args[0], "C:004") == 0)
+    {
+      command_makeDirectory(args[1]);
+    }
+    else if (strcmp(args[0], "C:005") == 0)
+    {
+      command_remove(args[1]);
+    }
+    else if (strcmp(args[0], "C:999") == 0)
+    {
+      printf("QUIT: Client quiting\n");
+      return;
+    }
+    else
+    {
+      printf("ERROR: Invalid command provided\n");
+    }
   }
-  printf("Msg from client: %s\n", client_message);
-}
-
-void server_respond()
-{
-  strcpy(server_message, "This is the server's response message.");
-
-  if (send(client_sock, server_message, strlen(server_message), 0) < 0)
-  {
-    printf("ERROR: Can't send\n");
-    server_closeServerSocket();
-  }
-}
-
-void command_get(char *remote_file_path, char *local_file_path)
-{
-}
-
-void command_info(char *remote_file_path)
-{
-}
-
-void command_makeDirectory(char *folder_path)
-{
-}
-
-void command_put(char *local_file_path, char *remote_file_path)
-{
-}
-
-void command_remove(char *path)
-{
 }
 
 int main(void)
@@ -136,10 +256,10 @@ int main(void)
   server_listenForClients();
 
   // Receive client's message:
-  server_recieveMessage();
+  server_listenForCommand();
 
-  // Respond to client:
-  server_respond();
+  // // Respond to client:
+  // server_respond();
 
   // Closing server socket:
   server_closeServerSocket();
