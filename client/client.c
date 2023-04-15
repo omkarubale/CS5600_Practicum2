@@ -119,18 +119,24 @@ void command_info(char *remote_file_path)
   printf("COMMAND: INFO started\n");
 
   char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+  char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
 
   // empty string init
-  memset(client_message, 0, sizeof(client_message));
+  memset(client_message, '\0', sizeof(client_message));
+  memset(server_message, '\0', sizeof(server_message));
 
+  // build command to send to server
   char code[CODE_SIZE + CODE_PADDING] = "C:002 ";
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
-
   strncat(client_message, remote_file_path, strlen(remote_file_path));
 
+  // send command to server
   client_sendMessageToServer(client_message);
 
-  // TODO
+  // get response from server
+  client_recieveResponse(server_message);
+
+  memset(server_message, 0, sizeof(server_message));
 
   printf("COMMAND: INFO complete\n");
 }

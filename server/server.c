@@ -151,7 +151,63 @@ void command_info(char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
 
-  // TODO
+  char *actual_path;
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
+
+  printf("INFO: actual path: %s\n", actual_path);
+
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+
+  if (!isDirectoryExists(actual_path))
+  {
+    // directory doesn't exist
+    printf("INFO: Directory/File doesn't exist\n");
+
+    strcat(response_message, "E:404 ");
+    strcat(response_message, "Directory/File doesn't exist");
+
+    server_respond(response_message);
+  }
+  else
+  {
+    // directory exists
+    printf("INFO: Directory/File exists\n");
+
+    struct stat sb;
+
+    if (stat(actual_path, &sb) == -1)
+    {
+      printf("INFO ERROR: Directory/File Information Retrieval failed\n");
+      perror("stat");
+
+      strcat(response_message, "E:406 ");
+      strcat(response_message, "Directory/File Information Retrieval failed");
+
+      server_respond(response_message);
+    }
+    else
+    {
+      printf("INFO: Directory/File Information Retrieval successful\n");
+
+      strcat(response_message, "S:200 Information Retrieval successful\n");
+      char temp[2000];
+      memset(temp, '\0', sizeof(temp));
+
+      sprintf(temp, "Ownership:                UID=%ld   GID=%ld\n", (long)sb.st_uid, (long)sb.st_gid);
+      strcat(response_message, temp);
+      sprintf(temp, "File size:                %lld bytes\n", (long long)sb.st_size);
+      strcat(response_message, temp);
+      sprintf(temp, "Last file access:         %s", ctime(&sb.st_atime));
+      strcat(response_message, temp);
+      sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
+      strcat(response_message, temp);
+
+      server_respond(response_message);
+    }
+  }
 
   printf("COMMAND: INFO complete\n");
 }
