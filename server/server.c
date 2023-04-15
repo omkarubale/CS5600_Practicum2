@@ -306,25 +306,80 @@ void command_remove(char *path)
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
 
-  int res = rmrf(actual_path);
-  if (res != 0)
+  struct stat sb;
+
+  if (stat(actual_path, &sb) == -1)
   {
-    // creation of directory failed
-    printf("RM ERROR: Directory/File Removal failed\n");
-    strcat(response_message, "E:406 ");
-    strcat(response_message, "Directory/File Removal failed");
+    printf("RM ERROR: Directory/File Not Found\n");
+    perror("stat");
+
+    strcat(response_message, "E:404 ");
+    strcat(response_message, "Directory/File Not Found");
 
     server_respond(response_message);
   }
   else
   {
-    // creation of directory successful
-    printf("RM: Directory/File Removal successful\n");
 
-    strcat(response_message, "S:200 ");
-    strcat(response_message, "Directory/File Removal successful");
+    if (S_ISREG(sb.st_mode))
+    {
+      // Path is a regular file
+      int res = remove(actual_path);
 
-    server_respond(response_message);
+      if (res != 0)
+      {
+        // creation of directory failed
+        printf("RM ERROR: File Removal failed\n");
+        perror("remove");
+        strcat(response_message, "E:406 ");
+        strcat(response_message, "File Removal failed");
+
+        server_respond(response_message);
+      }
+      else
+      {
+        // creation of directory successful
+        printf("RM: File Removal successful\n");
+
+        strcat(response_message, "S:200 ");
+        strcat(response_message, "File Removal successful");
+
+        server_respond(response_message);
+      }
+    }
+    else if (S_ISDIR(sb.st_mode))
+    {
+      // Path is a directory
+      int res = rmrf(actual_path);
+
+      if (res != 0)
+      {
+        // creation of directory failed
+        printf("RM ERROR: Directory Removal failed\n");
+        perror("remove");
+        strcat(response_message, "E:406 ");
+        strcat(response_message, "Directory Removal failed");
+
+        server_respond(response_message);
+      }
+      else
+      {
+        // creation of directory successful
+        printf("RM: Directory Removal successful\n");
+
+        strcat(response_message, "S:200 ");
+        strcat(response_message, "Directory Removal successful");
+
+        server_respond(response_message);
+      }
+    }
+    else
+    {
+      // Unsupported path
+      printf("RM ERROR: Given path is not supported\n");
+      strcat(response_message, "E:406 ");
+      strcat(response_message, "Given path is not supported");
+    }
   }
 
   printf("COMMAND: RM complete\n");

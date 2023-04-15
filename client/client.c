@@ -348,6 +348,11 @@ void client_getCommand()
       {
         if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
         {
+          if (args[1][0] == '.' || args[1][0] == '/')
+          {
+            printf("ERROR: Invalid arguements for RM provided\n");
+            continue;
+          }
           command_remove(args[1]);
         }
         else
