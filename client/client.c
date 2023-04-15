@@ -15,7 +15,6 @@
 
 int socket_desc;
 struct sockaddr_in server_addr;
-char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
 
 void client_closeClientSocket()
 {
@@ -29,9 +28,6 @@ void client_closeClientSocket()
 
 void init_createClientSocket()
 {
-  // Clean buffers:
-  memset(server_message, '\0', sizeof(server_message));
-
   // Create socket:
   socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -79,16 +75,16 @@ void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + C
   }
 }
 
-void client_recieveResponse()
+void client_recieveResponse(char *server_message)
 {
   // Receive the server's response:
-  if (recv(socket_desc, server_message, sizeof(server_message), 0) < 0)
+  if (recv(socket_desc, server_message, CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE, 0) < 0)
   {
     printf("ERROR: Error while receiving server's msg\n");
     client_closeClientSocket();
   }
 
-  printf("Server's response: %s\n", server_message);
+  printf("RESPONSE: %s\n", server_message);
 }
 
 #pragma endregion Communication
@@ -167,20 +163,26 @@ void command_makeDirectory(char *folder_path)
   printf("COMMAND: MD started\n");
 
   char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+  char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
 
   // empty string init
-  memset(client_message, 0, sizeof(client_message));
+  memset(client_message, '\0', sizeof(client_message));
+  memset(server_message, '\0', sizeof(server_message));
 
+  // build command to send to server
   char code[CODE_SIZE + CODE_PADDING] = "C:004 ";
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
-
   strncat(client_message, folder_path, strlen(folder_path));
 
+  // send command to server
   client_sendMessageToServer(client_message);
 
-  // TODO
+  // get response from server
+  client_recieveResponse(server_message);
 
-  printf("COMMAND: MD complete\n");
+  memset(server_message, 0, sizeof(server_message));
+
+  printf("COMMAND: MD complete\n\n");
 }
 
 void command_remove(char *path)
@@ -367,10 +369,6 @@ int main(void)
 
   // Get text message to send to server:
   client_getCommand();
-  // // Send text message to server:
-  // client_sendMessageToServer();
-  // // Recieve response from server:
-  // client_recieveResponse();
 
   // Closing client socket:
   client_closeClientSocket();

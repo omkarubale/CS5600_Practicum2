@@ -11,7 +11,10 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "../common/common.h"
+
+#define ROOT_DIRECTORY "./root"
 
 int socket_desc, client_sock;
 socklen_t client_size;
@@ -27,7 +30,9 @@ void server_closeServerSocket()
   exit(1);
 }
 
-void init_createServerSocket()
+#pragma region Init
+
+int init_createServerSocket()
 {
   // Clean buffers:
   memset(server_message, '\0', sizeof(server_message));
@@ -40,11 +45,13 @@ void init_createServerSocket()
   {
     printf("ERROR: Error while creating socket\n");
     server_closeServerSocket();
+    return -1;
   }
   printf("INIT: Socket created successfully\n");
+  return 0;
 }
 
-void init_bindServerSocket()
+int init_bindServerSocket()
 {
   // Set port and IP:
   server_addr.sin_family = AF_INET;
@@ -56,26 +63,80 @@ void init_bindServerSocket()
   {
     printf("ERROR: Couldn't bind to the port\n");
     server_closeServerSocket();
+    return -1;
   }
   printf("INIT: Done with binding\n");
+  return 0;
 }
 
-void initServer()
+int init_createRootDirectory()
 {
-  init_createServerSocket();
-  init_bindServerSocket();
+  struct stat st = {0};
+
+  if (stat(ROOT_DIRECTORY, &st) == -1)
+  {
+    // created using S_IREAD, S_IWRITE, S_IEXEC (0400 | 0200 | 0100) permission flags
+    int res = mkdir(ROOT_DIRECTORY, 0700);
+    if (res != 0)
+    {
+      printf("ERROR: root directory creation failed\n");
+      return -1;
+    }
+  }
+
+  return 0;
 }
 
-void server_respond(char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE])
+int initServer()
 {
-  strcpy(server_message, "This is the server's response message.");
+  int status;
+  status = init_createServerSocket();
+  if (status != 0)
+    return -1;
+  status = init_bindServerSocket();
+  if (status != 0)
+    return -1;
+  status = init_createRootDirectory();
+  if (status != 0)
+    return -1;
 
+  return 0;
+}
+
+#pragma endregion Init
+
+#pragma region Communication
+
+void server_respond(char *server_message)
+{
+  printf("RESPONSE: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
   {
     printf("ERROR: Can't send\n");
     server_closeServerSocket();
   }
 }
+
+#pragma endregion Communication
+
+#pragma region Helpers
+
+int isDirectoryExists(const char *path)
+{
+  struct stat stats;
+
+  stat(path, &stats);
+
+  // Check for file existence
+  if (S_ISDIR(stats.st_mode))
+    return 1;
+
+  return 0;
+}
+
+#pragma endregion Helpers
+
+#pragma region Commands
 
 void command_get(char *remote_file_path, char *local_file_path)
 {
@@ -99,9 +160,55 @@ void command_makeDirectory(char *folder_path)
 {
   printf("COMMAND: MD started\n");
 
-  // TODO
+  char *actual_path;
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, folder_path, strlen(folder_path) - 1);
 
-  printf("COMMAND: MD complete\n");
+  printf("MD: actual path: %s\n", actual_path);
+
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+
+  if (isDirectoryExists(actual_path))
+  {
+    // directory already exists
+    printf("MD: Directory already exists\n");
+
+    strcat(response_message, "E:406 ");
+    strcat(response_message, "Directory already exists");
+
+    server_respond(response_message);
+  }
+  else
+  {
+    // directory doesn't exist
+    printf("MD: Directory doesn't exist, creating directory\n");
+
+    int res = mkdir(actual_path, 0700);
+    if (res != 0)
+    {
+      // creation of directory failed
+      printf("MD ERROR: directory creation failed\n");
+      perror("mkdir");
+      strcat(response_message, "E:406 ");
+      strcat(response_message, "Directory creation failed");
+
+      server_respond(response_message);
+    }
+    else
+    {
+      // creation of directory successful
+      printf("MD: Directory creation successful\n");
+
+      strcat(response_message, "S:200 ");
+      strcat(response_message, "Directory creation successful");
+
+      server_respond(response_message);
+    }
+  }
+
+  printf("COMMAND: MD complete\n\n");
 }
 
 void command_put(char *local_file_path, char *remote_file_path)
@@ -122,12 +229,15 @@ void command_remove(char *path)
   printf("COMMAND: RM complete\n");
 }
 
-void server_listenForClients()
+#pragma endregion Commands
+
+int server_listenForClients()
 {
   if (listen(socket_desc, 1) < 0)
   {
     printf("ERROR: Error while listening\n");
     server_closeServerSocket();
+    return -1;
   }
   printf("\nListening for incoming connections.....\n");
 
@@ -139,8 +249,10 @@ void server_listenForClients()
   {
     printf("ERROR: Can't accept\n");
     server_closeServerSocket();
+    return -1;
   }
   printf("Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+  return 0;
 }
 
 void server_listenForCommand()
@@ -207,7 +319,6 @@ void server_listenForCommand()
       if (argc >= argcLimit)
       {
         printf("ERROR: Invalid number of arguements provided\n");
-        // continue;
       }
 
       args[argc++] = pch;
@@ -249,17 +360,19 @@ void server_listenForCommand()
 
 int main(void)
 {
+  int status;
   // Initialize server socket and bind to port:
-  initServer();
+  status = initServer();
+  if (status != 0)
+    return 0;
 
   // Listen for clients:
-  server_listenForClients();
+  status = server_listenForClients();
+  if (status != 0)
+    return 0;
 
   // Receive client's message:
   server_listenForCommand();
-
-  // // Respond to client:
-  // server_respond();
 
   // Closing server socket:
   server_closeServerSocket();
