@@ -151,7 +151,7 @@ void command_info(char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
 
-  char *actual_path;
+  char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
@@ -216,7 +216,7 @@ void command_makeDirectory(char *folder_path)
 {
   printf("COMMAND: MD started\n");
 
-  char *actual_path;
+  char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
   strncat(actual_path, folder_path, strlen(folder_path) - 1);
