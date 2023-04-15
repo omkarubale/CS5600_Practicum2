@@ -11,6 +11,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <ftw.h>
 #include <sys/stat.h>
 #include "../common/common.h"
 
@@ -132,6 +133,21 @@ int isDirectoryExists(const char *path)
     return 1;
 
   return 0;
+}
+
+int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+  int rv = remove(fpath);
+
+  if (rv)
+    perror(fpath);
+
+  return rv;
+}
+
+int rmrf(char *path)
+{
+  return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
 #pragma endregion Helpers
@@ -280,7 +296,36 @@ void command_remove(char *path)
 {
   printf("COMMAND: RM started\n");
 
-  // TODO
+  char *actual_path;
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, path, strlen(path) - 1);
+
+  printf("RM: actual path: %s\n", actual_path);
+
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+
+  int res = rmrf(actual_path);
+  if (res != 0)
+  {
+    // creation of directory failed
+    printf("RM ERROR: Directory/File Removal failed\n");
+    strcat(response_message, "E:406 ");
+    strcat(response_message, "Directory/File Removal failed");
+
+    server_respond(response_message);
+  }
+  else
+  {
+    // creation of directory successful
+    printf("RM: Directory/File Removal successful\n");
+
+    strcat(response_message, "S:200 ");
+    strcat(response_message, "Directory/File Removal successful");
+
+    server_respond(response_message);
+  }
 
   printf("COMMAND: RM complete\n");
 }
