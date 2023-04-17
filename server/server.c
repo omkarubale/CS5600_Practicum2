@@ -4,6 +4,7 @@
  * adapted from:
  *   https://www.educative.io/answers/how-to-implement-tcp-sockets-in-c
  */
+#define _XOPEN_SOURCE 500 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,8 +12,11 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <ftw.h>
 #include <sys/stat.h>
 #include "../common/common.h"
+
+#define __USE_XOPEN_EXTENDED 
 
 #define ROOT_DIRECTORY "./root"
 
@@ -58,7 +62,7 @@ int init_bindServerSocket()
   server_addr.sin_port = htons(SERVER_PORT);
   server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
-  // Bind to the set port and IP:
+  // Bind to the set port and IP:S
   if (bind(socket_desc, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
   {
     printf("ERROR: Couldn't bind to the port\n");
@@ -134,16 +138,139 @@ int isDirectoryExists(const char *path)
   return 0;
 }
 
+int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+  int rv = remove(fpath);
+
+  if (rv)
+    perror(fpath);
+
+  return rv;
+}
+
+int rmrf(char *path)
+{
+  return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
 #pragma endregion Helpers
 
 #pragma region Commands
 
+/*
 void command_get(char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
+  char server_response[200];
+  FILE *remote_file;
+  
+  char filename[200] =  "./root/try1/hello.txt";
+  remote_file = fopen(filename, "r");
+  perror("fopen");
+  printf("Starting CHeck\n");
+  // Check if the file exists on the server
+  if ( remote_file == NULL)
+  {
+    printf("Error: File not found on server\n");
+    snprintf(server_response, 1000, "E:404 File not found on server");
+    send(client_sock, server_response, strlen(server_response), 0);
+  }
+  else {
+    printf("File Found\n");
+    // Send success response to client
+    snprintf(server_response, 1000, "S:200 File found on server\n");
+    send(client_sock, server_response, strlen(server_response), 0);
+    
+    recv(client_sock, client_command, sizeof(client_command), 0);
+    if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
+      // Send file data to client
+      printf("Client hited at sending file contents.\n");
+      char buffer[1000];
+      int bytes_read;
 
-  // TODO
+      while ((bytes_read = fread(buffer, sizeof(char), 1000, remote_file)) > 0)
+      {
+        snprintf(server_response, 1000, "S:100 Data Incoming\n");
+        send(client_sock, server_response, strlen(server_response), 0);
 
+        recv(client_sock, client_command, sizeof(client_command), 0);
+        printf("Client Command: %s \n", client_command);
+        if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
+          printf("BUFFER: %s \n", buffer);
+          send(client_sock, buffer, bytes_read, 0);
+        }
+        else {
+          printf("");
+          snprintf(server_response, 1000, "S:404 Data Finished\n");
+          send(client_sock, server_response, strlen(server_response), 0);
+          printf("File sent successfully\n");
+          break;
+        }
+
+        // printf("BUFFER: %s \n", buffer);
+        // snprintf(server_response, 1000, "S:100 Data Incoming\n");
+        // send(client_sock, server_response, strlen(server_response), 0);
+        // send(client_sock, buffer, bytes_read, 0);
+      }
+    }
+    else {
+      printf("The client did not agree to receive the file contents.\n");
+    }
+
+  }
+
+  fclose(remote_file);
+  printf("COMMAND: GET complete\n");
+}
+*/
+void command_get(char *remote_file_path, char *local_file_path)
+{
+  printf("COMMAND: GET started\n");
+  char server_response[200];
+  FILE *remote_file;
+  
+  // char filename[200] =  "./root/try1/hello.txt";
+  remote_file = fopen(remote_file_path, "r");
+  perror("fopen");
+  printf("Starting CHeck\n");
+  // Check if the file exists on the server
+  if ( remote_file == NULL)
+  {
+    printf("Error: File not found on server\n");
+    snprintf(server_response, 1000, "E:404 File not found on server");
+    send(client_sock, server_response, strlen(server_response), 0);
+  }
+  else {
+    printf("File Found\n");
+    // Send success response to client
+    snprintf(server_response, 1000, "S:200 File found on server\n");
+    send(client_sock, server_response, strlen(server_response), 0);
+    
+    recv(client_sock, client_command, sizeof(client_command), 0);
+    if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
+      // Send file data to client
+      printf("Client hited at sending file contents.\n");
+      char buffer[1000];
+      int bytes_read;
+
+      if ((bytes_read = fread(buffer, sizeof(char), 1000, remote_file)) > 0)
+      {
+        printf("BUFFER: %s \n", buffer);
+        send(client_sock, buffer, bytes_read, 0);
+      }
+
+      snprintf(server_response, 0, "");
+      send(client_sock, server_response, strlen(server_response), 0);
+
+      printf("File sent successfully\n");
+    }
+    else {
+      printf("The client did not agree to receive the file contents.\n");
+    }
+
+  }
+
+  fclose(remote_file);
   printf("COMMAND: GET complete\n");
 }
 
@@ -280,7 +407,91 @@ void command_remove(char *path)
 {
   printf("COMMAND: RM started\n");
 
-  // TODO
+  char actual_path[200];
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, path, strlen(path) - 1);
+
+  printf("RM: actual path: %s\n", actual_path);
+
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+
+  struct stat sb;
+
+  if (stat(actual_path, &sb) == -1)
+  {
+    printf("RM ERROR: Directory/File Not Found\n");
+    perror("stat");
+
+    strcat(response_message, "E:404 ");
+    strcat(response_message, "Directory/File Not Found");
+
+    server_respond(response_message);
+  }
+  else
+  {
+
+    if (S_ISREG(sb.st_mode))
+    {
+      // Path is a regular file
+      int res = remove(actual_path);
+
+      if (res != 0)
+      {
+        // creation of directory failed
+        printf("RM ERROR: File Removal failed\n");
+        perror("remove");
+        strcat(response_message, "E:406 ");
+        strcat(response_message, "File Removal failed");
+
+        server_respond(response_message);
+      }
+      else
+      {
+        // creation of directory successful
+        printf("RM: File Removal successful\n");
+
+        strcat(response_message, "S:200 ");
+        strcat(response_message, "File Removal successful");
+
+        server_respond(response_message);
+      }
+    }
+    else if (S_ISDIR(sb.st_mode))
+    {
+      // Path is a directory
+      int res = rmrf(actual_path);
+
+      if (res != 0)
+      {
+        // creation of directory failed
+        printf("RM ERROR: Directory Removal failed\n");
+        perror("remove");
+        strcat(response_message, "E:406 ");
+        strcat(response_message, "Directory Removal failed");
+
+        server_respond(response_message);
+      }
+      else
+      {
+        // creation of directory successful
+        printf("RM: Directory Removal successful\n");
+
+        strcat(response_message, "S:200 ");
+        strcat(response_message, "Directory Removal successful");
+
+        server_respond(response_message);
+      }
+    }
+    else
+    {
+      // Unsupported path
+      printf("RM ERROR: Given path is not supported\n");
+      strcat(response_message, "E:406 ");
+      strcat(response_message, "Given path is not supported");
+    }
+  }
 
   printf("COMMAND: RM complete\n");
 }
@@ -416,6 +627,16 @@ void server_listenForCommand()
 
 int main(void)
 {
+
+  #if defined __STDC_VERSION__  
+    long version = __STDC_VERSION__;   
+    if ( version == 199901 ) { printf ("version detected : C99\n"); }    
+    if ( version == 201112 ) { printf ("version detected : C11\n"); }    
+    if ( version == 201710 ) { printf ("version detected : C18\n"); } 
+  #else 
+    printf ("version detected : C90\n");
+  #endif
+
   int status;
   // Initialize server socket and bind to port:
   status = initServer();

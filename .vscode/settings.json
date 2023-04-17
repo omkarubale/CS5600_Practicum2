@@ -1,6 +1,7 @@
 {
   "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
   "files.associations": {
-    "common.h": "c"
+    "common.h": "c",
+    "ftw.h": "c"
   }
 }
