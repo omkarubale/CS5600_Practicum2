@@ -4,7 +4,7 @@
  * adapted from:
  *   https://www.educative.io/answers/how-to-implement-tcp-sockets-in-c
  */
-#define _XOPEN_SOURCE 500 
+#define _XOPEN_SOURCE 500
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include "../common/common.h"
 
-#define __USE_XOPEN_EXTENDED 
+#define __USE_XOPEN_EXTENDED
 
 #define ROOT_DIRECTORY "./root"
 
@@ -113,12 +113,24 @@ int initServer()
 
 void server_respond(char *server_message)
 {
-  printf("RESPONSE: %s\n", server_message);
+  printf("SENDING TO CLIENT: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
   {
     printf("ERROR: Can't send\n");
     server_closeServerSocket();
   }
+}
+
+void server_recieveResponse(char *client_message)
+{
+  // Receive the server's response:
+  if (recv(client_sock, client_message, CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE, 0) < 0)
+  {
+    printf("ERROR: Error while receiving client's msg\n");
+    server_closeServerSocket();
+  }
+
+  printf("RECIEVED FROM CLIENT: %s\n", client_message);
 }
 
 #pragma endregion Communication
@@ -163,7 +175,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET started\n");
   char server_response[200];
   FILE *remote_file;
-  
+
   char filename[200] =  "./root/try1/hello.txt";
   remote_file = fopen(filename, "r");
   perror("fopen");
@@ -180,7 +192,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     // Send success response to client
     snprintf(server_response, 1000, "S:200 File found on server\n");
     send(client_sock, server_response, strlen(server_response), 0);
-    
+
     recv(client_sock, client_command, sizeof(client_command), 0);
     if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
       // Send file data to client
@@ -228,45 +240,104 @@ void command_get(char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET started\n");
   char server_response[200];
   FILE *remote_file;
-  
-  remote_file = fopen(remote_file_path, "r");
-  perror("fopen");
-  printf("Starting CHeck\n");
+
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+
+  char actual_path[200];
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
+
+  remote_file = fopen(actual_path, "r");
+  printf("GET: Looking for file: %s\n", actual_path);
+
   // Check if the file exists on the server
-  if ( remote_file == NULL)
+  if (remote_file == NULL)
   {
-    printf("Error: File not found on server\n");
-    snprintf(server_response, 1000, "E:404 File not found on server");
-    send(client_sock, server_response, strlen(server_response), 0);
+    // file doesn't exist
+    printf("GET ERROR: File not found on server\n");
+
+    strcat(response_message, "E:404 ");
+    strcat(response_message, "File not found on server");
+
+    server_respond(response_message);
   }
-  else {
-    printf("File Found\n");
+  else
+  {
+    printf("GET: File Found on server\n");
+
     // Send success response to client
-    snprintf(server_response, 1000, "S:200 File found on server\n");
-    send(client_sock, server_response, strlen(server_response), 0);
-    
-    recv(client_sock, client_command, sizeof(client_command), 0);
-    if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
+    strcat(response_message, "S:200 ");
+    strcat(response_message, "File found on server");
+
+    server_respond(response_message);
+    memset(response_message, 0, sizeof(response_message));
+
+    // recieve client's first response
+    char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+    memset(client_message, '\0', sizeof(client_message));
+
+    server_recieveResponse(client_message);
+
+    if (strncmp(client_message, "S:100", CODE_SIZE) == 0)
+    {
+      // Client said we can start sending the file
       // Send file data to client
-      printf("Client hinted at sending file contents.\n");
-      char buffer[1000];
+      printf("GET: Client hinted at sending file contents.\n");
+      char buffer[SERVER_MESSAGE_SIZE];
       int bytes_read;
+      int bytesReadSoFar = 0;
 
-      if ((bytes_read = fread(buffer, sizeof(char), 1000, remote_file)) > 0)
+      while (true)
       {
-        printf("BUFFER: %s \n", buffer);
-        send(client_sock, buffer, bytes_read, 0);
+        if (strncmp(client_message, "S:100", CODE_SIZE) != 0)
+        {
+          printf("GET ERROR: stopped abruptly because client is not accepting data anymore\n");
+          break;
+        }
+
+        if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE, remote_file)) > 0)
+        {
+          bytesReadSoFar += bytes_read;
+
+          printf("BUFFER: %s \n", buffer);
+          memset(response_message, 0, sizeof(response_message));
+
+          strcat(response_message, "S:206 ");
+          strncat(response_message, buffer, bytes_read);
+
+          server_respond(response_message);
+
+          memset(client_message, '\0', sizeof(client_message));
+
+          server_recieveResponse(client_message);
+        }
+        else
+        {
+          printf("GET: reached end of file\n");
+
+          memset(response_message, 0, sizeof(response_message));
+
+          strcat(response_message, "S:200 ");
+          strcat(response_message, "File sent successfully");
+
+          server_respond(response_message);
+          break;
+        }
       }
-
-      snprintf(server_response, 0, "");
-      send(client_sock, server_response, strlen(server_response), 0);
-
-      printf("File sent successfully\n");
     }
-    else {
-      printf("The client did not agree to receive the file contents.\n");
-    }
+    else
+    {
+      memset(response_message, 0, sizeof(response_message));
 
+      strcat(response_message, "E:500 ");
+      strcat(response_message, "The client did not agree to receive the file contents.");
+
+      server_respond(response_message);
+
+      printf("GET: The client did not agree to receive the file contents.\n");
+    }
   }
 
   fclose(remote_file);
@@ -326,9 +397,9 @@ void command_info(char *remote_file_path)
       strcat(response_message, temp);
       sprintf(temp, "File size:                %lld bytes\n", (long long)sb.st_size);
       strcat(response_message, temp);
-      sprintf(temp, "Last file access:         %s", ctime(&sb.st_atime));
+      sprintf(temp, "Last file access:         %ld", sb.st_atime);
       strcat(response_message, temp);
-      sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
+      sprintf(temp, "Last file modification:   %ld", sb.st_mtime);
       strcat(response_message, temp);
 
       server_respond(response_message);
@@ -397,55 +468,55 @@ void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
-  // TODO
-  char client_message[1000];
-  char server_response[1000];
-  FILE *remote_file;
+  // // TODO
+  // char client_message[1000];
+  // char server_response[1000];
+  // FILE *remote_file;
 
-  // Receive client message
-  int bytes_received = recv(client_sock, client_message, 1000, 0);
-  if (bytes_received < 0)
-  {
-    perror("Error receiving server response");
-    exit(EXIT_FAILURE);
-  }
-  printf("CM: %s\n", client_message);
+  // // Receive client message
+  // int bytes_received = recv(client_sock, client_message, 1000, 0);
+  // if (bytes_received < 0)
+  // {
+  //   perror("Error receiving server response");
+  //   exit(EXIT_FAILURE);
+  // }
+  // printf("CM: %s\n", client_message);
 
-  // Check if the file exists on the server
-  if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
-  {
-    printf("CLient Message: %s \n", client_message);
+  // // Check if the file exists on the server
+  // if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
+  // {
+  //   printf("CLient Message: %s \n", client_message);
 
-    // Hint the server to send the file data requested
-    snprintf(server_response, 1000, "S:100 Success Continue\n");
-    send(client_sock, server_response, strlen(server_response), 0);
+  //   // Hint the server to send the file data requested
+  //   snprintf(server_response, 1000, "S:100 Success Continue\n");
+  //   send(client_sock, server_response, strlen(server_response), 0);
 
-    // Open local file for writing
-    remote_file = fopen(remote_file_path, "w");
-    // fwrite(server_response, sizeof(char), 1000, local_file);
-    // Receive file data from server and write it to local file
-    char buffer[10000];
-    int bytes_received;
-    printf("HERE 2 \n");
+  //   // Open local file for writing
+  //   remote_file = fopen(remote_file_path, "w");
+  //   // fwrite(server_response, sizeof(char), 1000, local_file);
+  //   // Receive file data from server and write it to local file
+  //   char buffer[10000];
+  //   int bytes_received;
+  //   printf("HERE 2 \n");
 
-    if (1)
-    {
-      bytes_received = recv(client_sock, buffer, 1000, 0);
-      if (bytes_received <= 0)
-      {
-        printf("ZERO BYTE BLOCK");
-      }
-      fwrite(buffer, sizeof(char), bytes_received, remote_file);
-    }
+  //   if (1)
+  //   {
+  //     bytes_received = recv(client_sock, buffer, 1000, 0);
+  //     if (bytes_received <= 0)
+  //     {
+  //       printf("ZERO BYTE BLOCK");
+  //     }
+  //     fwrite(buffer, sizeof(char), bytes_received, remote_file);
+  //   }
 
-    fclose(remote_file);
+  //   fclose(remote_file);
 
-    printf("File received successfully\n");
-  }
-  else
-  {
-    printf("RESPONSE Error: File not found on Client\n");
-  }
+  //   printf("File received successfully\n");
+  // }
+  // else
+  // {
+  //   printf("RESPONSE Error: File not found on Client\n");
+  // }
 
   printf("COMMAND: PUT complete\n");
 }
@@ -674,16 +745,6 @@ void server_listenForCommand()
 
 int main(void)
 {
-
-  #if defined __STDC_VERSION__  
-    long version = __STDC_VERSION__;   
-    if ( version == 199901 ) { printf ("version detected : C99\n"); }    
-    if ( version == 201112 ) { printf ("version detected : C11\n"); }    
-    if ( version == 201710 ) { printf ("version detected : C18\n"); } 
-  #else 
-    printf ("version detected : C90\n");
-  #endif
-
   int status;
   // Initialize server socket and bind to port:
   status = initServer();

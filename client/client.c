@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include "../common/common.h"
 
+#define ROOT_DIRECTORY "./root"
+
 int socket_desc;
 struct sockaddr_in server_addr;
 
@@ -67,10 +69,12 @@ void client_connect()
 
 void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE])
 {
+  printf("SENDING TO SERVER: %s \n", client_message);
+
   // Send the message to server:
   if (send(socket_desc, client_message, strlen(client_message), 0) < 0)
   {
-    printf("ERROR: Unable to send message\n");
+    printf("ERROR: Unable to send message \n");
     client_closeClientSocket();
   }
 }
@@ -80,27 +84,27 @@ void client_recieveResponse(char *server_message)
   // Receive the server's response:
   if (recv(socket_desc, server_message, CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE, 0) < 0)
   {
-    printf("ERROR: Error while receiving server's msg\n");
+    printf("ERROR: Error while receiving server's message \n");
     client_closeClientSocket();
   }
 
-  printf("RESPONSE: %s\n", server_message);
+  printf("RECIEVED FROM SERVER: %s \n", server_message);
 }
 
 #pragma endregion Communication
 
 #pragma region Commands
 
-/*
 void command_get(char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
 
   char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
-
-  // empty string init
   memset(client_message, 0, sizeof(client_message));
+  char server_response[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(server_response, 0, sizeof(server_response));
 
+  // sending message to server
   char code[CODE_SIZE + CODE_PADDING] = "C:001 ";
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
 
@@ -110,157 +114,84 @@ void command_get(char *remote_file_path, char *local_file_path)
 
   client_sendMessageToServer(client_message);
 
-  char server_response[10000];
-  FILE *local_file;
-
   // Receive server response
-  int bytes_received = recv(socket_desc, server_response, 1000, 0);
-  if (bytes_received < 0)
-  {
-    perror("Error receiving server response");
-    exit(EXIT_FAILURE);
-  }
-  printf("SR: %s\n", server_response);
+  client_recieveResponse(server_response);
 
   // Check if the file exists on the server
   if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
   {
-    printf("Server Response: %s \n", server_response);
+    printf("GET: File Found - Server Response: %s \n", server_response);
+
+    FILE *local_file;
 
     // Hint the server to send the file data requested
-    // snprintf(client_message, 1000, "S:100 Success Continue\n");
-    // send(socket_desc, client_message, strlen(client_message), 0);
+    memset(client_message, 0, sizeof(client_message));
+    strcat(client_message, "S:100 ");
+    strcat(client_message, "Success Continue");
+
+    client_sendMessageToServer(client_message);
 
     // Open local file for writing
-    local_file = fopen(local_file_path, "w");
-    // fwrite(server_response, sizeof(char), 1000, local_file);
+    char actual_path[200];
+    strcpy(actual_path, ROOT_DIRECTORY);
+    strcat(actual_path, "/");
+    strncat(actual_path, local_file_path, strlen(local_file_path) - 1);
+
+    local_file = fopen(actual_path, "w");
+
     // Receive file data from server and write it to local file
-    char buffer_message[10000];
-    char buffer_data[10000];
-    int bytes_received_message;
-    int bytes_received_data;
-    printf("HERE 2 \n");
-
-    
-    while (1)
-    {
-      printf("INSIDE WHILE");
-
-      bytes_received_message = recv(socket_desc, buffer_message, 1000, 0);
-      printf("Message Received: %s \n", buffer_message);
-
-      if (strncmp(bytes_received_message, "S:100", CODE_SIZE) == 0) {
-
-        snprintf(client_message, 1000, "S:100 Success Continue Sending Data\n");
-        send(socket_desc, client_message, strlen(client_message), 0);
-
-        bytes_received_data = recv(socket_desc, buffer_data, 1000, 0);
-        fwrite(buffer_data, sizeof(char), bytes_received_data, local_file);
-
-      }
-      else {
-        // break;
-        fclose(local_file);
-
-        printf("File received successfully\n");
-      }
-      // if (bytes_received <= 0)
-      // {
-      //   break;
-      // }
-      // fprintf(local_file, "%s", buffer);
-      // fwrite(buffer, sizeof(char), bytes_received, local_file);
-      // bzero(buffer, bytes_received);
-    }
-    
-  while (1)
-  {
-    
-  }
-  
-
-    fclose(local_file);
-
-    printf("File received successfully\n");
-  }
-  else
-  {
-    printf("RESPONSE Error: File not found on server\n");
-  }
-
-
-  printf("COMMAND: GET complete\n");
-}
-*/
-void command_get(char *remote_file_path, char *local_file_path)
-{
-  printf("COMMAND: GET started\n");
-
-  char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
-
-  // empty string init
-  memset(client_message, 0, sizeof(client_message));
-
-  char code[CODE_SIZE + CODE_PADDING] = "C:001 ";
-  strncat(client_message, code, CODE_SIZE + CODE_PADDING);
-
-  strncat(client_message, remote_file_path, strlen(remote_file_path));
-  strncat(client_message, " ", 1);
-  strncat(client_message, local_file_path, strlen(local_file_path));
-
-  client_sendMessageToServer(client_message);
-
-  char server_response[1000];
-  FILE *local_file;
-
-  // Receive server response
-  int bytes_received = recv(socket_desc, server_response, 1000, 0);
-  if (bytes_received < 0)
-  {
-    perror("Error receiving server response");
-    exit(EXIT_FAILURE);
-  }
-  printf("SR: %s\n", server_response);
-
-  // Check if the file exists on the server
-  if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
-  {
-    printf("Server Response: %s \n", server_response);
-
-    // Hint the server to send the file data requested
-    snprintf(client_message, 1000, "S:100 Success Continue\n");
-    send(socket_desc, client_message, strlen(client_message), 0);
-
-    // Open local file for writing
-    local_file = fopen(local_file_path, "w");
-    // fwrite(server_response, sizeof(char), 1000, local_file);
-    // Receive file data from server and write it to local file
-    char buffer[10000];
+    char buffer[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
     int bytes_received;
-    printf("HERE 2 \n");
 
-    if (1)
+    // get first block from server
+    memset(server_response, 0, sizeof(server_response));
+    client_recieveResponse(server_response);
+
+    // continue taking blocks from server until it is done
+    while (true)
     {
-      bytes_received = recv(socket_desc, buffer, 1000, 0);
-      if (bytes_received <= 0)
+      if (strncmp(server_response, "S:206", CODE_SIZE) == 0)
       {
-        printf("ZERO BYTE BLOCK");
+        char *file_contents;
+        file_contents = server_response + CODE_SIZE + CODE_PADDING;
+
+        printf("GET: Writing to file: %s\n", file_contents);
+
+        fwrite(file_contents, sizeof(char), strlen(file_contents), local_file);
+
+        memset(client_message, 0, sizeof(client_message));
+        strcat(client_message, "S:100 ");
+        strcat(client_message, "Success Continue");
+
+        client_sendMessageToServer(client_message);
+
+        // get next block from server
+        memset(server_response, 0, sizeof(server_response));
+        client_recieveResponse(server_response);
       }
-      fwrite(buffer, sizeof(char), bytes_received, local_file);
+      else if (strncmp(server_response, "E:500", CODE_SIZE) == 0)
+      {
+        printf("GET ERROR: File could not be recieved\n");
+
+        break;
+      }
+      else if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
+      {
+        printf("GET: File received successfully\n");
+
+        break;
+      }
     }
 
     fclose(local_file);
-
-    printf("File received successfully\n");
   }
   else
   {
-    printf("RESPONSE Error: File not found on server\n");
+    printf("GET: File Not Found - Server Response: %s \n", server_response);
   }
 
-
-  printf("COMMAND: GET complete\n");
-} 
+  printf("COMMAND: GET complete\n\n");
+}
 
 void command_info(char *remote_file_path)
 {
@@ -286,7 +217,7 @@ void command_info(char *remote_file_path)
 
   memset(server_message, 0, sizeof(server_message));
 
-  printf("COMMAND: INFO complete\n");
+  printf("COMMAND: INFO complete\n\n");
 }
 
 void command_put(char *local_file_path, char *remote_file_path)
@@ -315,20 +246,22 @@ void command_put(char *local_file_path, char *remote_file_path)
   perror("fopen");
   printf("Starting CHeck\n");
 
-  if ( local_file == NULL)
+  if (local_file == NULL)
   {
     printf("Error: File not found on client\n");
     snprintf(client_message, 0, "");
     send(socket_desc, client_message, strlen(client_message), 0);
   }
-  else {
+  else
+  {
     printf("File present on the client\n");
     // Send success response to client
     snprintf(client_message, 1000, "S:200 File found on server\n");
     send(socket_desc, client_message, strlen(client_message), 0);
-    
+
     recv(socket_desc, server_response, sizeof(server_response), 0);
-    if (strncmp(server_response, "S:100", CODE_SIZE) == 0) {
+    if (strncmp(server_response, "S:100", CODE_SIZE) == 0)
+    {
       // Send file data to client
       printf("Server hinted OK to receive file contents.\n");
       char buffer[1000];
@@ -345,13 +278,13 @@ void command_put(char *local_file_path, char *remote_file_path)
 
       printf("File sent successfully\n");
     }
-    else {
+    else
+    {
       printf("The Server did not agree to receive the file contents.\n");
     }
-
   }
 
-  printf("COMMAND: PUT complete\n");
+  printf("COMMAND: PUT complete\n\n");
 }
 
 void command_makeDirectory(char *folder_path)
@@ -405,7 +338,7 @@ void command_remove(char *path)
 
   memset(server_message, 0, sizeof(server_message));
 
-  printf("COMMAND: RM complete\n");
+  printf("COMMAND: RM complete\n\n");
 }
 
 #pragma endregion Commands
@@ -426,9 +359,9 @@ void client_getCommand()
       pch = strtok(client_command, " ");
 
       char *args[3];
-      args[0] = (char*) malloc(sizeof(char)*200);
-      args[1] = (char*) malloc(sizeof(char)*200);
-      args[2] = (char*) malloc(sizeof(char)*200);
+      args[0] = (char *)malloc(sizeof(char) * 200);
+      args[1] = (char *)malloc(sizeof(char) * 200);
+      args[2] = (char *)malloc(sizeof(char) * 200);
       args[0] = pch;
       pch = strtok(NULL, " ");
 
@@ -492,13 +425,14 @@ void client_getCommand()
       {
         if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
         {
-          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0) {
+          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0)
+          {
             command_get(args[1], args[2]);
           }
-          else {
+          else
+          {
             command_get(args[1], args[1]);
           }
-          
         }
         else
         {
@@ -520,12 +454,14 @@ void client_getCommand()
       }
       else if (strcmp(args[0], "PUT") == 0)
       {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0 )
+        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
         {
-          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0) {
+          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0)
+          {
             command_put(args[1], args[2]);
           }
-          else {
+          else
+          {
             command_put(args[1], args[1]);
           }
         }
