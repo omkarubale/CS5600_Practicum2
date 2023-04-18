@@ -210,7 +210,7 @@ void command_get(char *remote_file_path, char *local_file_path)
 
   client_sendMessageToServer(client_message);
 
-  char server_response[10000];
+  char server_response[1000];
   FILE *local_file;
 
   // Receive server response
@@ -221,7 +221,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     exit(EXIT_FAILURE);
   }
   printf("SR: %s\n", server_response);
-  printf("SR 2: %s\n", server_response);
+
   // Check if the file exists on the server
   if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
   {
@@ -248,17 +248,6 @@ void command_get(char *remote_file_path, char *local_file_path)
       }
       fwrite(buffer, sizeof(char), bytes_received, local_file);
     }
-
-
-    // int n;
-    // while(1) {
-    //   n = recv(socket_desc, buffer, 1000, 0);
-    //   if (n<= 0) {
-    //     break;
-    //   }
-    //   fprintf(local_file, "%s", buffer);
-    //   bzero(buffer, 1000);
-    // }
 
     fclose(local_file);
 
@@ -319,6 +308,48 @@ void command_put(char *local_file_path, char *remote_file_path)
   client_sendMessageToServer(client_message);
 
   // TODO
+  char server_response[200];
+  FILE *local_file;
+  printf("Local File Path: %s \n", local_file_path);
+  local_file = fopen(local_file_path, "r");
+  perror("fopen");
+  printf("Starting CHeck\n");
+
+  if ( local_file == NULL)
+  {
+    printf("Error: File not found on client\n");
+    snprintf(client_message, 0, "");
+    send(socket_desc, client_message, strlen(client_message), 0);
+  }
+  else {
+    printf("File present on the client\n");
+    // Send success response to client
+    snprintf(client_message, 1000, "S:200 File found on server\n");
+    send(socket_desc, client_message, strlen(client_message), 0);
+    
+    recv(socket_desc, server_response, sizeof(server_response), 0);
+    if (strncmp(server_response, "S:100", CODE_SIZE) == 0) {
+      // Send file data to client
+      printf("Server hinted OK to receive file contents.\n");
+      char buffer[1000];
+      int bytes_read;
+
+      if ((bytes_read = fread(buffer, sizeof(char), 1000, local_file)) > 0)
+      {
+        printf("BUFFER: %s \n", buffer);
+        send(socket_desc, buffer, bytes_read, 0);
+      }
+
+      snprintf(server_response, 0, "");
+      send(socket_desc, server_response, strlen(server_response), 0);
+
+      printf("File sent successfully\n");
+    }
+    else {
+      printf("The Server did not agree to receive the file contents.\n");
+    }
+
+  }
 
   printf("COMMAND: PUT complete\n");
 }

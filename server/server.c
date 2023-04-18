@@ -229,7 +229,6 @@ void command_get(char *remote_file_path, char *local_file_path)
   char server_response[200];
   FILE *remote_file;
   
-  // char filename[200] =  "./root/try1/hello.txt";
   remote_file = fopen(remote_file_path, "r");
   perror("fopen");
   printf("Starting CHeck\n");
@@ -249,7 +248,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     recv(client_sock, client_command, sizeof(client_command), 0);
     if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
       // Send file data to client
-      printf("Client hited at sending file contents.\n");
+      printf("Client hinted at sending file contents.\n");
       char buffer[1000];
       int bytes_read;
 
@@ -399,6 +398,54 @@ void command_put(char *local_file_path, char *remote_file_path)
   printf("COMMAND: PUT started\n");
 
   // TODO
+  char client_message[1000];
+  char server_response[1000];
+  FILE *remote_file;
+
+  // Receive client message
+  int bytes_received = recv(client_sock, client_message, 1000, 0);
+  if (bytes_received < 0)
+  {
+    perror("Error receiving server response");
+    exit(EXIT_FAILURE);
+  }
+  printf("CM: %s\n", client_message);
+
+  // Check if the file exists on the server
+  if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
+  {
+    printf("CLient Message: %s \n", client_message);
+
+    // Hint the server to send the file data requested
+    snprintf(server_response, 1000, "S:100 Success Continue\n");
+    send(client_sock, server_response, strlen(server_response), 0);
+
+    // Open local file for writing
+    remote_file = fopen(remote_file_path, "w");
+    // fwrite(server_response, sizeof(char), 1000, local_file);
+    // Receive file data from server and write it to local file
+    char buffer[10000];
+    int bytes_received;
+    printf("HERE 2 \n");
+
+    if (1)
+    {
+      bytes_received = recv(client_sock, buffer, 1000, 0);
+      if (bytes_received <= 0)
+      {
+        printf("ZERO BYTE BLOCK");
+      }
+      fwrite(buffer, sizeof(char), bytes_received, remote_file);
+    }
+
+    fclose(remote_file);
+
+    printf("File received successfully\n");
+  }
+  else
+  {
+    printf("RESPONSE Error: File not found on Client\n");
+  }
 
   printf("COMMAND: PUT complete\n");
 }
