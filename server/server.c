@@ -25,10 +25,16 @@
 int socket_desc;
 struct sockaddr_in server_addr;
 
+pthread_mutex_t command_mutex;
+
 void server_closeServerSocket()
 {
   close(socket_desc);
-  printf("EXIT: closing server socket\n");
+  printf("EXIT: closed server socket\n");
+
+  pthread_mutex_destroy(&command_mutex);
+  printf("EXIT: destroyed command mutex\n");
+
   exit(1);
 }
 
@@ -90,6 +96,16 @@ int init_createRootDirectory()
   return 0;
 }
 
+int init_createCommandMutex()
+{
+  if (pthread_mutex_init(&command_mutex, NULL) != 0)
+  {
+    printf("INIT ERROR: output file mutex init failed\n");
+    return -1;
+  }
+  return 0;
+}
+
 int initServer()
 {
   int status;
@@ -100,6 +116,9 @@ int initServer()
   if (status != 0)
     return -1;
   status = init_createRootDirectory();
+  if (status != 0)
+    return -1;
+  status = init_createCommandMutex();
   if (status != 0)
     return -1;
 
@@ -183,6 +202,9 @@ int rmrf(char *path)
 void command_get(int client_sock, char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
+
+  pthread_mutex_lock(&command_mutex);
+
   FILE *remote_file;
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
@@ -288,12 +310,16 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   }
 
   fclose(remote_file);
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: GET complete\n\n");
 }
 
 void command_info(int client_sock, char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -355,12 +381,16 @@ void command_info(int client_sock, char *remote_file_path)
     }
   }
 
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: INFO complete\n\n");
 }
 
 void command_makeDirectory(int client_sock, char *folder_path)
 {
   printf("COMMAND: MD started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -410,12 +440,16 @@ void command_makeDirectory(int client_sock, char *folder_path)
     }
   }
 
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: MD complete\n\n");
 }
 
 void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   // prepare the file to write into
   FILE *remote_file;
@@ -495,12 +529,16 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
     fclose(remote_file);
   }
 
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: PUT complete\n\n");
 }
 
 void command_remove(int client_sock, char *path)
 {
   printf("COMMAND: RM started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -589,6 +627,8 @@ void command_remove(int client_sock, char *path)
       server_sendMessageToClient(client_sock, response_message);
     }
   }
+
+  pthread_mutex_unlock(&command_mutex);
 
   printf("COMMAND: RM complete\n\n");
 }
@@ -748,6 +788,8 @@ int main(void)
     // Create a new detached thread to serve client's message:
     pthread_t thread_for_client_request;
     pthread_attr_t attr;
+
+    // detach thread so that it can end without having to join it here again
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
@@ -760,6 +802,7 @@ int main(void)
 
     *arg = client_sock;
 
+    // start listening for command from client
     pthread_create(&thread_for_client_request, NULL, server_listenForCommand, arg);
   }
 
