@@ -21,8 +21,6 @@
 
 #define __USE_XOPEN_EXTENDED
 
-// #define ROOT_DIRECTORY "./root"
-
 int socket_desc;
 struct sockaddr_in server_addr;
 
@@ -283,7 +281,6 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
       char buffer[SERVER_MESSAGE_SIZE - 1];
       memset(buffer, 0, sizeof(buffer));
       int bytes_read;
-      int bytesReadSoFar = 0;
 
       while (true)
       {
@@ -295,8 +292,6 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
 
         if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE - 1, remote_file)) > 0)
         {
-          bytesReadSoFar += bytes_read;
-
           printf("BUFFER: %s \n", buffer);
           memset(response_message, 0, sizeof(response_message));
 
