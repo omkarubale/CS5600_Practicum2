@@ -15,25 +15,25 @@
 #include <ftw.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <pthread.h>
 #include "../common/common.h"
 
 #define __USE_XOPEN_EXTENDED
 
 #define ROOT_DIRECTORY "./root"
 
-int socket_desc, client_sock;
+int socket_desc;
 socklen_t client_size;
 struct sockaddr_in server_addr, client_addr;
 
 void server_closeServerSocket()
 {
-  close(client_sock);
   close(socket_desc);
   printf("EXIT: closing server socket\n");
   exit(1);
 }
 
-void server_closeClientSocket()
+void server_closeClientSocket(int client_sock)
 {
   close(client_sock);
 }
@@ -111,7 +111,7 @@ int initServer()
 
 #pragma region Communication
 
-void server_sendMessageToClient(char *server_message)
+void server_sendMessageToClient(int client_sock, char *server_message)
 {
   printf("SENDING TO CLIENT: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
@@ -121,7 +121,7 @@ void server_sendMessageToClient(char *server_message)
   }
 }
 
-void server_recieveMessageFromClient(char *client_message)
+void server_recieveMessageFromClient(int client_sock, char *client_message)
 {
   // Receive the server's response:
   if (recv(client_sock, client_message, CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE, 0) < 0)
@@ -181,7 +181,7 @@ int rmrf(char *path)
 
 #pragma region Commands
 
-void command_get(char *remote_file_path, char *local_file_path)
+void command_get(int client_sock, char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
   FILE *remote_file;
@@ -206,7 +206,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "File not found on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -216,14 +216,14 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "S:200 ");
     strcat(response_message, "File found on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
     memset(response_message, 0, sizeof(response_message));
 
     // recieve client's first response
     char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
     memset(client_message, '\0', sizeof(client_message));
 
-    server_recieveMessageFromClient(client_message);
+    server_recieveMessageFromClient(client_sock, client_message);
 
     if (strncmp(client_message, "S:100", CODE_SIZE) == 0)
     {
@@ -255,11 +255,11 @@ void command_get(char *remote_file_path, char *local_file_path)
 
           memset(buffer, 0, sizeof(buffer));
 
-          server_sendMessageToClient(response_message);
+          server_sendMessageToClient(client_sock, response_message);
 
           memset(client_message, '\0', sizeof(client_message));
 
-          server_recieveMessageFromClient(client_message);
+          server_recieveMessageFromClient(client_sock, client_message);
         }
         else
         {
@@ -270,7 +270,7 @@ void command_get(char *remote_file_path, char *local_file_path)
           strcat(response_message, "S:200 ");
           strcat(response_message, "File sent successfully");
 
-          server_sendMessageToClient(response_message);
+          server_sendMessageToClient(client_sock, response_message);
           break;
         }
       }
@@ -282,7 +282,7 @@ void command_get(char *remote_file_path, char *local_file_path)
       strcat(response_message, "E:500 ");
       strcat(response_message, "The client did not agree to receive the file contents.");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
 
       printf("GET: The client did not agree to receive the file contents.\n");
     }
@@ -292,7 +292,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET complete\n\n");
 }
 
-void command_info(char *remote_file_path)
+void command_info(int client_sock, char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
 
@@ -314,7 +314,7 @@ void command_info(char *remote_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File doesn't exist");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -331,7 +331,7 @@ void command_info(char *remote_file_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory/File Information Retrieval failed");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
     else
     {
@@ -352,14 +352,14 @@ void command_info(char *remote_file_path)
       sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
       strcat(response_message, temp);
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
 
   printf("COMMAND: INFO complete\n\n");
 }
 
-void command_makeDirectory(char *folder_path)
+void command_makeDirectory(int client_sock, char *folder_path)
 {
   printf("COMMAND: MD started\n");
 
@@ -381,7 +381,7 @@ void command_makeDirectory(char *folder_path)
     strcat(response_message, "E:406 ");
     strcat(response_message, "Directory already exists");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -397,7 +397,7 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory creation failed");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
     else
     {
@@ -407,14 +407,14 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "S:200 ");
       strcat(response_message, "Directory creation successful");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
 
   printf("COMMAND: MD complete\n\n");
 }
 
-void command_put(char *local_file_path, char *remote_file_path)
+void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
@@ -439,7 +439,7 @@ void command_put(char *local_file_path, char *remote_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "File could not be opened. Please check whether the location exists.");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -447,10 +447,10 @@ void command_put(char *local_file_path, char *remote_file_path)
     strcat(response_message, "S:100 ");
     strcat(response_message, "Ready to write file on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
 
     // get first block from client
-    server_recieveMessageFromClient(client_message);
+    server_recieveMessageFromClient(client_sock, client_message);
 
     while (true)
     {
@@ -467,11 +467,11 @@ void command_put(char *local_file_path, char *remote_file_path)
         strcat(response_message, "S:100 ");
         strcat(response_message, "Success Continue");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
 
         // get next block from client
         memset(client_message, 0, sizeof(client_message));
-        server_recieveMessageFromClient(client_message);
+        server_recieveMessageFromClient(client_sock, client_message);
       }
       else if (strncmp(client_message, "E:500", CODE_SIZE) == 0)
       {
@@ -485,7 +485,7 @@ void command_put(char *local_file_path, char *remote_file_path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "File received successfully");
 
-        server_sendMessageToClient(client_message);
+        server_sendMessageToClient(client_sock, client_message);
 
         printf("PUT: File received successfully\n");
 
@@ -499,7 +499,7 @@ void command_put(char *local_file_path, char *remote_file_path)
   printf("COMMAND: PUT complete\n\n");
 }
 
-void command_remove(char *path)
+void command_remove(int client_sock, char *path)
 {
   printf("COMMAND: RM started\n");
 
@@ -523,7 +523,7 @@ void command_remove(char *path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File Not Found");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -541,7 +541,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "File Removal failed");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
       else
       {
@@ -551,7 +551,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "File Removal successful");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
     }
     else if (S_ISDIR(sb.st_mode))
@@ -567,7 +567,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "Directory Removal failed");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
       else
       {
@@ -577,7 +577,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "Directory Removal successful");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
     }
     else
@@ -586,6 +586,8 @@ void command_remove(char *path)
       printf("RM ERROR: Given path is not supported\n");
       strcat(response_message, "E:406 ");
       strcat(response_message, "Given path is not supported");
+
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
 
@@ -606,7 +608,7 @@ int server_listenForClients()
 
   // Accept an incoming connection:
   client_size = sizeof(client_addr);
-  client_sock = accept(socket_desc, (struct sockaddr *)&client_addr, &client_size);
+  int client_sock = accept(socket_desc, (struct sockaddr *)&client_addr, &client_size);
 
   if (client_sock < 0)
   {
@@ -614,21 +616,30 @@ int server_listenForClients()
     server_closeServerSocket();
     return -1;
   }
-  printf("Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-  return 0;
+  printf("CLIENT CONNECTION: Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+  printf("CLIENT CONNECTION: Client socket: %d\n", client_sock);
+  return client_sock;
 }
 
-void server_listenForCommand()
+void *server_listenForCommand(void *client_sock_arg)
 {
+  int client_sock = *((int *)client_sock_arg);
+  free(client_sock_arg);
+
   char client_command[CLIENT_COMMAND_SIZE];
   memset(client_command, 0, sizeof(client_command));
+
+  printf("LISTEN: listening for command from client socket: %d\n", client_sock);
+
   if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
   {
-    printf("ERROR: Couldn't receive\n");
-    server_closeServerSocket();
+    printf("LISTEN ERROR: Couldn't listen for command\n");
+    server_closeClientSocket(client_sock);
+
+    return NULL;
   }
 
-  printf("Msg from client: %s\n", client_command);
+  printf("LISTEN: Message from client: %s\n", client_command);
 
   // Interpret entered command
   char *pch;
@@ -663,14 +674,10 @@ void server_listenForCommand()
   {
     argcLimit = 2;
   }
-  else if (strcmp(args[0], "C:999") == 0)
-  {
-    argcLimit = 1;
-  }
   else
   {
-    printf("ERROR: Invalid command provided\n");
-    server_sendMessageToClient("E:404 Invalid command");
+    printf("LISTEN ERROR: Invalid command provided\n");
+    server_sendMessageToClient(client_sock, "E:404 Invalid command");
   }
 
   // Parse remaining arguements based on set command
@@ -679,7 +686,7 @@ void server_listenForCommand()
   {
     if (argc >= argcLimit)
     {
-      printf("ERROR: Invalid number of arguements provided\n");
+      printf("LISTEN ERROR: Invalid number of arguements provided\n");
     }
 
     args[argc++] = pch;
@@ -689,33 +696,33 @@ void server_listenForCommand()
   // Redirect to correct command
   if (strcmp(args[0], "C:001") == 0)
   {
-    command_get(args[1], args[2]);
+    command_get(client_sock, args[1], args[2]);
   }
   else if (strcmp(args[0], "C:002") == 0)
   {
-    command_info(args[1]);
+    command_info(client_sock, args[1]);
   }
   else if (strcmp(args[0], "C:003") == 0)
   {
-    command_put(args[1], args[2]);
+    command_put(client_sock, args[1], args[2]);
   }
   else if (strcmp(args[0], "C:004") == 0)
   {
-    command_makeDirectory(args[1]);
+    command_makeDirectory(client_sock, args[1]);
   }
   else if (strcmp(args[0], "C:005") == 0)
   {
-    command_remove(args[1]);
-  }
-  else if (strcmp(args[0], "C:999") == 0)
-  {
-    printf("QUIT: Client quiting\n");
-    return;
+    command_remove(client_sock, args[1]);
   }
   else
   {
-    printf("ERROR: Invalid command provided\n");
+    printf("LISTEN ERROR: Invalid command provided\n");
   }
+
+  printf("LISTEN: Closing connection for client socket %d\n", client_sock);
+  server_closeClientSocket(client_sock);
+
+  return NULL;
 }
 
 int main(void)
@@ -729,12 +736,29 @@ int main(void)
   while (true)
   {
     // Listen for clients:
-    status = server_listenForClients();
-    if (status != 0)
-      return 0;
+    int client_sock = server_listenForClients();
+    if (client_sock < 0)
+    {
+      printf("CLIENT CONNECTION ERROR: Client could not be connected\n");
+      continue;
+    }
 
-    // Receive client's message:
-    server_listenForCommand();
+    // Create a new detached thread to serve client's message:
+    pthread_t thread_for_client_request;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    int *arg = malloc(sizeof(*arg));
+    if (arg == NULL)
+    {
+      fprintf(stderr, "CLIENT CONNECTION ERROR: Couldn't allocate memory for thread arguments.\n");
+      exit(EXIT_FAILURE);
+    }
+
+    *arg = client_sock;
+
+    pthread_create(&thread_for_client_request, NULL, server_listenForCommand, arg);
   }
 
   // Closing server socket:
