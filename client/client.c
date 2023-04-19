@@ -271,7 +271,7 @@ void command_put(char *local_file_path, char *remote_file_path)
     {
       // Server is ready to recieve file contents. Start sending file
       printf("PUT: Server hinted at accepting file contents.\n");
-      char buffer[CLIENT_MESSAGE_SIZE];
+      char buffer[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE - 1];
       int bytes_read;
       int bytesReadSoFar = 0;
 
@@ -283,11 +283,12 @@ void command_put(char *local_file_path, char *remote_file_path)
           break;
         }
 
-        if ((bytes_read = fread(buffer, sizeof(char), CLIENT_MESSAGE_SIZE, local_file)) > 0)
+        if ((bytes_read = fread(buffer, sizeof(char), CLIENT_MESSAGE_SIZE - 1, local_file)) > 0)
         {
           bytesReadSoFar += bytes_read;
 
           printf("BUFFER: %s \n", buffer);
+
           memset(client_message, 0, sizeof(client_message));
 
           strcat(client_message, "S:206 ");
@@ -296,7 +297,6 @@ void command_put(char *local_file_path, char *remote_file_path)
           client_sendMessageToServer(client_message);
 
           memset(server_response, '\0', sizeof(server_response));
-
           client_recieveMessageFromServer(server_response);
         }
         else

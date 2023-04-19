@@ -224,7 +224,7 @@ void command_get(char *remote_file_path, char *local_file_path)
       // Client said we can start sending the file
       // Send file data to client
       printf("GET: Client hinted at sending file contents.\n");
-      char buffer[SERVER_MESSAGE_SIZE];
+      char buffer[SERVER_MESSAGE_SIZE - 1];
       memset(buffer, 0, sizeof(buffer));
       int bytes_read;
       int bytesReadSoFar = 0;
@@ -237,7 +237,7 @@ void command_get(char *remote_file_path, char *local_file_path)
           break;
         }
 
-        if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE, remote_file)) > 0)
+        if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE - 1, remote_file)) > 0)
         {
           bytesReadSoFar += bytes_read;
 
