@@ -111,7 +111,7 @@ int initServer()
 
 #pragma region Communication
 
-void server_respond(char *server_message)
+void server_sendMessageToClient(char *server_message)
 {
   printf("SENDING TO CLIENT: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
@@ -121,7 +121,7 @@ void server_respond(char *server_message)
   }
 }
 
-void server_recieveResponse(char *client_message)
+void server_recieveMessageFromClient(char *client_message)
 {
   // Receive the server's response:
   if (recv(client_sock, client_message, CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE, 0) < 0)
@@ -169,76 +169,9 @@ int rmrf(char *path)
 
 #pragma region Commands
 
-/*
 void command_get(char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
-  char server_response[200];
-  FILE *remote_file;
-
-  char filename[200] =  "./root/try1/hello.txt";
-  remote_file = fopen(filename, "r");
-  perror("fopen");
-  printf("Starting CHeck\n");
-  // Check if the file exists on the server
-  if ( remote_file == NULL)
-  {
-    printf("Error: File not found on server\n");
-    snprintf(server_response, 1000, "E:404 File not found on server");
-    send(client_sock, server_response, strlen(server_response), 0);
-  }
-  else {
-    printf("File Found\n");
-    // Send success response to client
-    snprintf(server_response, 1000, "S:200 File found on server\n");
-    send(client_sock, server_response, strlen(server_response), 0);
-
-    recv(client_sock, client_command, sizeof(client_command), 0);
-    if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
-      // Send file data to client
-      printf("Client hited at sending file contents.\n");
-      char buffer[1000];
-      int bytes_read;
-
-      while ((bytes_read = fread(buffer, sizeof(char), 1000, remote_file)) > 0)
-      {
-        snprintf(server_response, 1000, "S:100 Data Incoming\n");
-        send(client_sock, server_response, strlen(server_response), 0);
-
-        recv(client_sock, client_command, sizeof(client_command), 0);
-        printf("Client Command: %s \n", client_command);
-        if (strncmp(client_command, "S:100", CODE_SIZE) == 0) {
-          printf("BUFFER: %s \n", buffer);
-          send(client_sock, buffer, bytes_read, 0);
-        }
-        else {
-          printf("");
-          snprintf(server_response, 1000, "S:404 Data Finished\n");
-          send(client_sock, server_response, strlen(server_response), 0);
-          printf("File sent successfully\n");
-          break;
-        }
-
-        // printf("BUFFER: %s \n", buffer);
-        // snprintf(server_response, 1000, "S:100 Data Incoming\n");
-        // send(client_sock, server_response, strlen(server_response), 0);
-        // send(client_sock, buffer, bytes_read, 0);
-      }
-    }
-    else {
-      printf("The client did not agree to receive the file contents.\n");
-    }
-
-  }
-
-  fclose(remote_file);
-  printf("COMMAND: GET complete\n");
-}
-*/
-void command_get(char *remote_file_path, char *local_file_path)
-{
-  printf("COMMAND: GET started\n");
-  char server_response[200];
   FILE *remote_file;
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
@@ -261,7 +194,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "File not found on server");
 
-    server_respond(response_message);
+    server_sendMessageToClient(response_message);
   }
   else
   {
@@ -271,14 +204,14 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "S:200 ");
     strcat(response_message, "File found on server");
 
-    server_respond(response_message);
+    server_sendMessageToClient(response_message);
     memset(response_message, 0, sizeof(response_message));
 
     // recieve client's first response
     char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
     memset(client_message, '\0', sizeof(client_message));
 
-    server_recieveResponse(client_message);
+    server_recieveMessageFromClient(client_message);
 
     if (strncmp(client_message, "S:100", CODE_SIZE) == 0)
     {
@@ -307,11 +240,11 @@ void command_get(char *remote_file_path, char *local_file_path)
           strcat(response_message, "S:206 ");
           strncat(response_message, buffer, bytes_read);
 
-          server_respond(response_message);
+          server_sendMessageToClient(response_message);
 
           memset(client_message, '\0', sizeof(client_message));
 
-          server_recieveResponse(client_message);
+          server_recieveMessageFromClient(client_message);
         }
         else
         {
@@ -322,7 +255,7 @@ void command_get(char *remote_file_path, char *local_file_path)
           strcat(response_message, "S:200 ");
           strcat(response_message, "File sent successfully");
 
-          server_respond(response_message);
+          server_sendMessageToClient(response_message);
           break;
         }
       }
@@ -334,7 +267,7 @@ void command_get(char *remote_file_path, char *local_file_path)
       strcat(response_message, "E:500 ");
       strcat(response_message, "The client did not agree to receive the file contents.");
 
-      server_respond(response_message);
+      server_sendMessageToClient(response_message);
 
       printf("GET: The client did not agree to receive the file contents.\n");
     }
@@ -366,7 +299,7 @@ void command_info(char *remote_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File doesn't exist");
 
-    server_respond(response_message);
+    server_sendMessageToClient(response_message);
   }
   else
   {
@@ -383,7 +316,7 @@ void command_info(char *remote_file_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory/File Information Retrieval failed");
 
-      server_respond(response_message);
+      server_sendMessageToClient(response_message);
     }
     else
     {
@@ -402,7 +335,7 @@ void command_info(char *remote_file_path)
       sprintf(temp, "Last file modification:   %ld", sb.st_mtime);
       strcat(response_message, temp);
 
-      server_respond(response_message);
+      server_sendMessageToClient(response_message);
     }
   }
 
@@ -431,7 +364,7 @@ void command_makeDirectory(char *folder_path)
     strcat(response_message, "E:406 ");
     strcat(response_message, "Directory already exists");
 
-    server_respond(response_message);
+    server_sendMessageToClient(response_message);
   }
   else
   {
@@ -447,7 +380,7 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory creation failed");
 
-      server_respond(response_message);
+      server_sendMessageToClient(response_message);
     }
     else
     {
@@ -457,7 +390,7 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "S:200 ");
       strcat(response_message, "Directory creation successful");
 
-      server_respond(response_message);
+      server_sendMessageToClient(response_message);
     }
   }
 
@@ -468,57 +401,76 @@ void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
-  // // TODO
-  // char client_message[1000];
-  // char server_response[1000];
-  // FILE *remote_file;
+  // Tell client that server is ready to recieve the file
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+  char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(client_message, 0, sizeof(client_message));
 
-  // // Receive client message
-  // int bytes_received = recv(client_sock, client_message, 1000, 0);
-  // if (bytes_received < 0)
-  // {
-  //   perror("Error receiving server response");
-  //   exit(EXIT_FAILURE);
-  // }
-  // printf("CM: %s\n", client_message);
+  strcat(response_message, "S:100 ");
+  strcat(response_message, "Ready to write file on server");
 
-  // // Check if the file exists on the server
-  // if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
-  // {
-  //   printf("CLient Message: %s \n", client_message);
+  server_sendMessageToClient(response_message);
 
-  //   // Hint the server to send the file data requested
-  //   snprintf(server_response, 1000, "S:100 Success Continue\n");
-  //   send(client_sock, server_response, strlen(server_response), 0);
+  // prepare the file to write into
+  FILE *remote_file;
+  char actual_path[200];
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
 
-  //   // Open local file for writing
-  //   remote_file = fopen(remote_file_path, "w");
-  //   // fwrite(server_response, sizeof(char), 1000, local_file);
-  //   // Receive file data from server and write it to local file
-  //   char buffer[10000];
-  //   int bytes_received;
-  //   printf("HERE 2 \n");
+  remote_file = fopen(actual_path, "w");
 
-  //   if (1)
-  //   {
-  //     bytes_received = recv(client_sock, buffer, 1000, 0);
-  //     if (bytes_received <= 0)
-  //     {
-  //       printf("ZERO BYTE BLOCK");
-  //     }
-  //     fwrite(buffer, sizeof(char), bytes_received, remote_file);
-  //   }
+  // get first block from client
+  server_recieveMessageFromClient(client_message);
 
-  //   fclose(remote_file);
+  char buffer[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+  int bytes_received;
 
-  //   printf("File received successfully\n");
-  // }
-  // else
-  // {
-  //   printf("RESPONSE Error: File not found on Client\n");
-  // }
+  while (true)
+  {
+    if (strncmp(client_message, "S:206", CODE_SIZE) == 0)
+    {
+      char *file_contents;
+      file_contents = client_message + CODE_SIZE + CODE_PADDING;
 
-  printf("COMMAND: PUT complete\n");
+      printf("PUT: Writing to file: %s\n", file_contents);
+
+      fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file);
+
+      memset(response_message, 0, sizeof(response_message));
+      strcat(response_message, "S:100 ");
+      strcat(response_message, "Success Continue");
+
+      server_sendMessageToClient(response_message);
+
+      // get next block from client
+      memset(client_message, 0, sizeof(client_message));
+      server_recieveMessageFromClient(client_message);
+    }
+    else if (strncmp(client_message, "E:500", CODE_SIZE) == 0)
+    {
+      printf("PUT ERROR: File could not be recieved\n");
+
+      break;
+    }
+    else if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
+    {
+      memset(response_message, 0, sizeof(response_message));
+      strcat(response_message, "S:200 ");
+      strcat(response_message, "File received successfully");
+
+      server_sendMessageToClient(client_message);
+
+      printf("PUT: File received successfully\n");
+
+      break;
+    }
+  }
+
+  fclose(remote_file);
+
+  printf("COMMAND: PUT complete\n\n");
 }
 
 void command_remove(char *path)
@@ -545,7 +497,7 @@ void command_remove(char *path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File Not Found");
 
-    server_respond(response_message);
+    server_sendMessageToClient(response_message);
   }
   else
   {
@@ -563,7 +515,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "File Removal failed");
 
-        server_respond(response_message);
+        server_sendMessageToClient(response_message);
       }
       else
       {
@@ -573,7 +525,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "File Removal successful");
 
-        server_respond(response_message);
+        server_sendMessageToClient(response_message);
       }
     }
     else if (S_ISDIR(sb.st_mode))
@@ -589,7 +541,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "Directory Removal failed");
 
-        server_respond(response_message);
+        server_sendMessageToClient(response_message);
       }
       else
       {
@@ -599,7 +551,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "Directory Removal successful");
 
-        server_respond(response_message);
+        server_sendMessageToClient(response_message);
       }
     }
     else
@@ -693,7 +645,7 @@ void server_listenForCommand()
     else
     {
       printf("ERROR: Invalid command provided\n");
-      server_respond("E:404 Invalid command");
+      server_sendMessageToClient("E:404 Invalid command");
       continue;
     }
 

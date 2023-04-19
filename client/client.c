@@ -79,7 +79,7 @@ void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + C
   }
 }
 
-void client_recieveResponse(char *server_message)
+void client_recieveMessageFromServer(char *server_message)
 {
   // Receive the server's response:
   if (recv(socket_desc, server_message, CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE, 0) < 0)
@@ -115,7 +115,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   client_sendMessageToServer(client_message);
 
   // Receive server response
-  client_recieveResponse(server_response);
+  client_recieveMessageFromServer(server_response);
 
   // Check if the file exists on the server
   if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
@@ -145,7 +145,7 @@ void command_get(char *remote_file_path, char *local_file_path)
 
     // get first block from server
     memset(server_response, 0, sizeof(server_response));
-    client_recieveResponse(server_response);
+    client_recieveMessageFromServer(server_response);
 
     // continue taking blocks from server until it is done
     while (true)
@@ -167,7 +167,7 @@ void command_get(char *remote_file_path, char *local_file_path)
 
         // get next block from server
         memset(server_response, 0, sizeof(server_response));
-        client_recieveResponse(server_response);
+        client_recieveMessageFromServer(server_response);
       }
       else if (strncmp(server_response, "E:500", CODE_SIZE) == 0)
       {
@@ -213,7 +213,7 @@ void command_info(char *remote_file_path)
   client_sendMessageToServer(client_message);
 
   // get response from server
-  client_recieveResponse(server_message);
+  client_recieveMessageFromServer(server_message);
 
   memset(server_message, 0, sizeof(server_message));
 
@@ -224,63 +224,105 @@ void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
-  char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+  char actual_path[200];
+  strcpy(actual_path, ROOT_DIRECTORY);
+  strcat(actual_path, "/");
+  strncat(actual_path, local_file_path, strlen(local_file_path) - 1);
 
-  // empty string init
-  memset(client_message, 0, sizeof(client_message));
-
-  char code[CODE_SIZE + CODE_PADDING] = "C:003 ";
-  strncat(client_message, code, CODE_SIZE + CODE_PADDING);
-
-  strncat(client_message, local_file_path, strlen(local_file_path));
-  strncat(client_message, " ", 1);
-  strncat(client_message, remote_file_path, strlen(remote_file_path));
-
-  client_sendMessageToServer(client_message);
-
-  // TODO
-  char server_response[200];
   FILE *local_file;
-  printf("Local File Path: %s \n", local_file_path);
-  local_file = fopen(local_file_path, "r");
-  perror("fopen");
-  printf("Starting CHeck\n");
+
+  local_file = fopen(actual_path, "r");
+  printf("PUT: Looking for file: %s\n", actual_path);
 
   if (local_file == NULL)
   {
-    printf("Error: File not found on client\n");
-    snprintf(client_message, 0, "");
-    send(socket_desc, client_message, strlen(client_message), 0);
+    // file doesn't exist on client
+    printf("PUT ERROR: File not found on client\n");
   }
   else
   {
-    printf("File present on the client\n");
-    // Send success response to client
-    snprintf(client_message, 1000, "S:200 File found on server\n");
-    send(socket_desc, client_message, strlen(client_message), 0);
+    printf("PUT: File Found on client\n");
 
-    recv(socket_desc, server_response, sizeof(server_response), 0);
+    char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
+    memset(client_message, 0, sizeof(client_message));
+    char server_response[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+    memset(server_response, 0, sizeof(server_response));
+
+    // sending message to server
+    char code[CODE_SIZE + CODE_PADDING] = "C:003 ";
+    strncat(client_message, code, CODE_SIZE + CODE_PADDING);
+
+    strncat(client_message, local_file_path, strlen(local_file_path));
+    strncat(client_message, " ", 1);
+    strncat(client_message, remote_file_path, strlen(remote_file_path));
+
+    client_sendMessageToServer(client_message);
+
+    // Receive server response
+    client_recieveMessageFromServer(server_response);
+
     if (strncmp(server_response, "S:100", CODE_SIZE) == 0)
     {
-      // Send file data to client
-      printf("Server hinted OK to receive file contents.\n");
-      char buffer[1000];
+      // Server is ready to recieve file contents. Start sending file
+      printf("PUT: Server hinted at accepting file contents.\n");
+      char buffer[CLIENT_MESSAGE_SIZE];
       int bytes_read;
+      int bytesReadSoFar = 0;
 
-      if ((bytes_read = fread(buffer, sizeof(char), 1000, local_file)) > 0)
+      while (true)
       {
-        printf("BUFFER: %s \n", buffer);
-        send(socket_desc, buffer, bytes_read, 0);
+        if (strncmp(server_response, "S:100", CODE_SIZE) != 0)
+        {
+          printf("GET ERROR: stopped abruptly because server is not accepting data anymore\n");
+          break;
+        }
+
+        if ((bytes_read = fread(buffer, sizeof(char), CLIENT_MESSAGE_SIZE, local_file)) > 0)
+        {
+          bytesReadSoFar += bytes_read;
+
+          printf("BUFFER: %s \n", buffer);
+          memset(client_message, 0, sizeof(client_message));
+
+          strcat(client_message, "S:206 ");
+          strncat(client_message, buffer, bytes_read);
+
+          client_sendMessageToServer(client_message);
+
+          memset(server_response, '\0', sizeof(server_response));
+
+          client_recieveMessageFromServer(server_response);
+        }
+        else
+        {
+          printf("PUT: reached end of file\n");
+
+          memset(client_message, 0, sizeof(client_message));
+
+          strcat(client_message, "S:200 ");
+          strcat(client_message, "File sent successfully");
+
+          client_sendMessageToServer(client_message);
+
+          memset(server_response, '\0', sizeof(server_response));
+
+          client_recieveMessageFromServer(server_response);
+
+          if (strncmp(server_response, "S:200", CODE_SIZE) == 0)
+          {
+            printf("PUT: Server received file successfully\n");
+          }
+          else
+          {
+            printf("PUT ERROR: Server did not recieve file successfully\n");
+          }
+          break;
+        }
       }
-
-      snprintf(server_response, 0, "");
-      send(socket_desc, server_response, strlen(server_response), 0);
-
-      printf("File sent successfully\n");
     }
     else
     {
-      printf("The Server did not agree to receive the file contents.\n");
+      printf("PUT: The server did not agree to receive the file contents.\n");
     }
   }
 
@@ -307,7 +349,7 @@ void command_makeDirectory(char *folder_path)
   client_sendMessageToServer(client_message);
 
   // get response from server
-  client_recieveResponse(server_message);
+  client_recieveMessageFromServer(server_message);
 
   memset(server_message, 0, sizeof(server_message));
 
@@ -334,7 +376,7 @@ void command_remove(char *path)
   client_sendMessageToServer(client_message);
 
   // get response from server
-  client_recieveResponse(server_message);
+  client_recieveMessageFromServer(server_message);
 
   memset(server_message, 0, sizeof(server_message));
 
