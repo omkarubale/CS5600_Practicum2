@@ -33,6 +33,11 @@ void server_closeServerSocket()
   exit(1);
 }
 
+void server_closeClientSocket()
+{
+  close(client_sock);
+}
+
 #pragma region Init
 
 int init_createServerSocket()
@@ -615,105 +620,101 @@ int server_listenForClients()
 
 void server_listenForCommand()
 {
-  while (true)
+  char client_command[CLIENT_COMMAND_SIZE];
+  memset(client_command, 0, sizeof(client_command));
+  if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
   {
-    char client_command[CLIENT_COMMAND_SIZE];
-    memset(client_command, 0, sizeof(client_command));
-    if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
+    printf("ERROR: Couldn't receive\n");
+    server_closeServerSocket();
+  }
+
+  printf("Msg from client: %s\n", client_command);
+
+  // Interpret entered command
+  char *pch;
+  pch = strtok(client_command, " \n");
+
+  char *args[3];
+
+  args[0] = pch;
+  pch = strtok(NULL, " \n");
+
+  // Set arguement Limits based on first argument
+  int argcLimit;
+  int argc = 1;
+
+  if (strcmp(args[0], "C:001") == 0)
+  {
+    argcLimit = 3;
+  }
+  else if (strcmp(args[0], "C:002") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:003") == 0)
+  {
+    argcLimit = 3;
+  }
+  else if (strcmp(args[0], "C:004") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:005") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:999") == 0)
+  {
+    argcLimit = 1;
+  }
+  else
+  {
+    printf("ERROR: Invalid command provided\n");
+    server_sendMessageToClient("E:404 Invalid command");
+  }
+
+  // Parse remaining arguements based on set command
+
+  while (pch != NULL)
+  {
+    if (argc >= argcLimit)
     {
-      printf("ERROR: Couldn't receive\n");
-      server_closeServerSocket();
+      printf("ERROR: Invalid number of arguements provided\n");
     }
 
-    printf("Msg from client: %s\n", client_command);
-
-    // Interpret entered command
-    char *pch;
-    pch = strtok(client_command, " \n");
-
-    char *args[3];
-
-    args[0] = pch;
+    args[argc++] = pch;
     pch = strtok(NULL, " \n");
+  }
 
-    // Set arguement Limits based on first argument
-    int argcLimit;
-    int argc = 1;
-
-    if (strcmp(args[0], "C:001") == 0)
-    {
-      argcLimit = 3;
-    }
-    else if (strcmp(args[0], "C:002") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:003") == 0)
-    {
-      argcLimit = 3;
-    }
-    else if (strcmp(args[0], "C:004") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:005") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:999") == 0)
-    {
-      argcLimit = 1;
-    }
-    else
-    {
-      printf("ERROR: Invalid command provided\n");
-      server_sendMessageToClient("E:404 Invalid command");
-      continue;
-    }
-
-    // Parse remaining arguements based on set command
-
-    while (pch != NULL)
-    {
-      if (argc >= argcLimit)
-      {
-        printf("ERROR: Invalid number of arguements provided\n");
-      }
-
-      args[argc++] = pch;
-      pch = strtok(NULL, " \n");
-    }
-
-    // Redirect to correct command
-    if (strcmp(args[0], "C:001") == 0)
-    {
-      command_get(args[1], args[2]);
-    }
-    else if (strcmp(args[0], "C:002") == 0)
-    {
-      command_info(args[1]);
-    }
-    else if (strcmp(args[0], "C:003") == 0)
-    {
-      command_put(args[1], args[2]);
-    }
-    else if (strcmp(args[0], "C:004") == 0)
-    {
-      command_makeDirectory(args[1]);
-    }
-    else if (strcmp(args[0], "C:005") == 0)
-    {
-      command_remove(args[1]);
-    }
-    else if (strcmp(args[0], "C:999") == 0)
-    {
-      printf("QUIT: Client quiting\n");
-      return;
-    }
-    else
-    {
-      printf("ERROR: Invalid command provided\n");
-    }
+  // Redirect to correct command
+  if (strcmp(args[0], "C:001") == 0)
+  {
+    command_get(args[1], args[2]);
+  }
+  else if (strcmp(args[0], "C:002") == 0)
+  {
+    command_info(args[1]);
+  }
+  else if (strcmp(args[0], "C:003") == 0)
+  {
+    command_put(args[1], args[2]);
+  }
+  else if (strcmp(args[0], "C:004") == 0)
+  {
+    command_makeDirectory(args[1]);
+  }
+  else if (strcmp(args[0], "C:005") == 0)
+  {
+    command_remove(args[1]);
+  }
+  else if (strcmp(args[0], "C:999") == 0)
+  {
+    printf("QUIT: Client quiting\n");
+    return;
+  }
+  else
+  {
+    printf("ERROR: Invalid command provided\n");
   }
 }
 
@@ -725,13 +726,16 @@ int main(void)
   if (status != 0)
     return 0;
 
-  // Listen for clients:
-  status = server_listenForClients();
-  if (status != 0)
-    return 0;
+  while (true)
+  {
+    // Listen for clients:
+    status = server_listenForClients();
+    if (status != 0)
+      return 0;
 
-  // Receive client's message:
-  server_listenForCommand();
+    // Receive client's message:
+    server_listenForCommand();
+  }
 
   // Closing server socket:
   server_closeServerSocket();
