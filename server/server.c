@@ -15,10 +15,11 @@
 #include <ftw.h>
 #include <sys/stat.h>
 #include "../common/common.h"
+#include "configserver.h"
 
 #define __USE_XOPEN_EXTENDED
 
-#define ROOT_DIRECTORY "./root"
+// #define ROOT_DIRECTORY "./root"
 
 int socket_desc, client_sock;
 socklen_t client_size;
