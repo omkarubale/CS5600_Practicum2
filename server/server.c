@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <ftw.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "../common/common.h"
 
 #define __USE_XOPEN_EXTENDED
@@ -331,7 +332,9 @@ void command_info(char *remote_file_path)
     {
       printf("INFO: Directory/File Information Retrieval successful\n");
 
+      printf("TEST: %s", response_message);
       strcat(response_message, "S:200 Information Retrieval successful\n");
+      printf("TEST2: %s", response_message);
       char temp[2000];
       memset(temp, '\0', sizeof(temp));
 
@@ -339,9 +342,9 @@ void command_info(char *remote_file_path)
       strcat(response_message, temp);
       sprintf(temp, "File size:                %lld bytes\n", (long long)sb.st_size);
       strcat(response_message, temp);
-      sprintf(temp, "Last file access:         %ld", sb.st_atime);
+      sprintf(temp, "Last file access:         %s", ctime(&sb.st_atime));
       strcat(response_message, temp);
-      sprintf(temp, "Last file modification:   %ld", sb.st_mtime);
+      sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
       strcat(response_message, temp);
 
       server_sendMessageToClient(response_message);
