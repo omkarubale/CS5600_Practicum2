@@ -18,6 +18,7 @@
 int socket_desc;
 struct sockaddr_in server_addr;
 
+/// @brief  Closes the open socket for the client.
 void client_closeClientSocket()
 {
   // Close the socket:
@@ -28,6 +29,7 @@ void client_closeClientSocket()
 
 #pragma region Init
 
+/// @brief Creates the socket for the client.
 void init_createClientSocket()
 {
   // Create socket:
@@ -42,11 +44,13 @@ void init_createClientSocket()
   printf("INIT: Socket created successfully\n");
 }
 
+/// @brief Initializes the client socket.
 void init_initClient()
 {
   init_createClientSocket();
 }
 
+/// @brief The client makes connection to the server.
 void client_connect()
 {
   // Set port and IP the same as server-side:
@@ -67,6 +71,8 @@ void client_connect()
 
 #pragma region Communication
 
+/// @brief To send message to the server.
+/// @param client_message represents the message to be sent.
 void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE])
 {
   printf("SENDING TO SERVER: %s \n", client_message);
@@ -79,6 +85,8 @@ void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + C
   }
 }
 
+/// @brief To receive a message from the server.
+/// @param server_message represents the received message.
 void client_recieveMessageFromServer(char *server_message)
 {
   // Receive the server's response:
@@ -95,6 +103,9 @@ void client_recieveMessageFromServer(char *server_message)
 
 #pragma region Commands
 
+/// @brief To get a file data from server to the local client space.
+/// @param remote_file_path is the path of the remote file on server to be retrieved.
+/// @param local_file_path is the file path where the data needs ro be stored in client.
 void command_get(char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
@@ -199,6 +210,8 @@ void command_get(char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET complete\n\n");
 }
 
+/// @brief To retreive relevant information for the file.
+/// @param remote_file_path is the path of the file whose info is requested.
 void command_info(char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
@@ -226,6 +239,9 @@ void command_info(char *remote_file_path)
   printf("COMMAND: INFO complete\n\n");
 }
 
+/// @brief To create and store a replica of a local client file to server space.
+/// @param local_file_path is the path of the local file.
+/// @param remote_file_path is the path in server where the replica needs to be saved.
 void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
@@ -336,6 +352,8 @@ void command_put(char *local_file_path, char *remote_file_path)
   printf("COMMAND: PUT complete\n\n");
 }
 
+/// @brief Creates a folder on the indicated path.
+/// @param folder_path represents the folder path that needs ro be created.
 void command_makeDirectory(char *folder_path)
 {
   printf("COMMAND: MD started\n");
@@ -363,6 +381,8 @@ void command_makeDirectory(char *folder_path)
   printf("COMMAND: MD complete\n\n");
 }
 
+/// @brief Removes a file or a directory.
+/// @param path represents the path of the object that needs to be removed
 void command_remove(char *path)
 {
   printf("COMMAND: RM started\n");
@@ -392,180 +412,108 @@ void command_remove(char *path)
 
 #pragma endregion Commands
 
-void client_getCommand()
+/// @brief The communication between our server and client is via well defined protocols. This method acts as a
+///         gateway for interaction and validation of requested commands. 
+/// @param argsCount represents the no. of arguments in the command.
+/// @param argv represents the arguments in the command.
+void client_parseCommand(int argsCount, char **argv)
 {
-  while (true)
+  // Redirect to correct command
+  if (strcmp(argv[1], "GET") == 0)
   {
-    char client_command[CLIENT_COMMAND_SIZE];
-    memset(client_command, 0, sizeof(client_command));
-
-    // Get input from the user:
-    printf("Enter command: ");
-    if (fgets(client_command, sizeof(client_command), stdin))
+    if (argsCount == 3)
     {
-      // Interpret entered command
-      char *pch;
-      pch = strtok(client_command, " \n");
-
-      char *args[3];
-      args[0] = (char *)malloc(sizeof(char) * 200);
-      args[1] = (char *)malloc(sizeof(char) * 200);
-      args[2] = (char *)malloc(sizeof(char) * 200);
-      args[0] = pch;
-      pch = strtok(NULL, " \n");
-
-      // Set arguement Limits based on first argument
-      int argcLimit;
-      int argc = 1;
-
-      if (strcmp(args[0], "GET") == 0)
-      {
-        argcLimit = 3;
-      }
-      else if (strcmp(args[0], "INFO") == 0)
-      {
-        argcLimit = 2;
-      }
-      else if (strcmp(args[0], "PUT") == 0)
-      {
-        argcLimit = 3;
-      }
-      else if (strcmp(args[0], "MD") == 0)
-      {
-        argcLimit = 2;
-      }
-      else if (strcmp(args[0], "RM") == 0)
-      {
-        argcLimit = 2;
-      }
-      else if (strcmp(args[0], "Q") == 0 || strcmp(args[0], "Q\n") == 0)
-      {
-        argcLimit = 1;
-      }
-      else
-      {
-        printf("ERROR: Invalid command provided\n");
-        continue;
-      }
-
-      // Parse remaining arguements based on set command
-      bool errorsInTokenization = false;
-      while (pch != NULL && argc < argcLimit)
-      {
-        if (argc >= argcLimit)
-        {
-          printf("ERROR: Invalid number of arguements provided\n");
-          pch = NULL;
-          errorsInTokenization = true;
-          break;
-        }
-
-        args[argc++] = pch;
-        pch = strtok(NULL, " \n");
-      }
-
-      if (errorsInTokenization)
-      {
-        continue;
-      }
-
-      // Redirect to correct command
-      if (strcmp(args[0], "GET") == 0)
-      {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
-        {
-          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0)
-          {
-            command_get(args[1], args[2]);
-          }
-          else
-          {
-            command_get(args[1], args[1]);
-          }
-        }
-        else
-        {
-          printf("ERROR: Invalid number of arguements provided1\n");
-          continue;
-        }
-      }
-      else if (strcmp(args[0], "INFO") == 0)
-      {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
-        {
-          command_info(args[1]);
-        }
-        else
-        {
-          printf("ERROR: Invalid number of arguements provided\n");
-          continue;
-        }
-      }
-      else if (strcmp(args[0], "PUT") == 0)
-      {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
-        {
-          if (strlen(args[2]) > 0 && strcmp(args[2], "\n") != 0)
-          {
-            command_put(args[1], args[2]);
-          }
-          else
-          {
-            command_put(args[1], args[1]);
-          }
-        }
-        else
-        {
-          printf("ERROR: Invalid number of arguements provided\n");
-          continue;
-        }
-      }
-      else if (strcmp(args[0], "MD") == 0)
-      {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
-        {
-          command_makeDirectory(args[1]);
-        }
-        else
-        {
-          printf("ERROR: Invalid number of arguements provided\n");
-          continue;
-        }
-      }
-      else if (strcmp(args[0], "RM") == 0)
-      {
-        if (strlen(args[1]) > 0 && strcmp(args[1], "\n") != 0)
-        {
-          if (args[1][0] == '.' || args[1][0] == '/')
-          {
-            printf("ERROR: Invalid arguements for RM provided\n");
-            continue;
-          }
-          command_remove(args[1]);
-        }
-        else
-        {
-          printf("ERROR: Invalid number of arguements provided\n");
-          continue;
-        }
-      }
-      else if (strcmp(args[0], "Q") == 0 || strcmp(args[0], "Q\n") == 0)
-      {
-        printf("CLIENT: quiting client\n");
-        client_sendMessageToServer("C:999");
-        return;
-      }
-      else
-      {
-        printf("ERROR: Invalid command provided\n");
-        continue;
-      }
+      command_get(argv[2], argv[2]);
     }
+    else if (argsCount == 4)
+    {
+      command_get(argv[2], argv[3]);
+    }
+    else
+    {
+      printf("ERROR: Invalid number of arguements provided\n");
+    }
+  }
+  else if (strcmp(argv[1], "INFO") == 0)
+  {
+    if (argsCount == 3)
+    {
+      command_info(argv[2]);
+    }
+    else
+    {
+      printf("ERROR: Invalid number of arguements provided\n");
+    }
+  }
+  else if (strcmp(argv[1], "PUT") == 0)
+  {
+    if (argsCount == 3)
+    {
+      command_put(argv[2], argv[2]);
+    }
+    else if (argsCount == 4)
+    {
+      command_put(argv[2], argv[3]);
+    }
+    else
+    {
+      printf("ERROR: Invalid number of arguements provided\n");
+    }
+  }
+  else if (strcmp(argv[1], "MD") == 0)
+  {
+    if (argsCount == 3)
+    {
+      if (argv[2][0] == '.' || argv[2][0] == '/')
+      {
+        printf("ERROR: Invalid arguements provided\n");
+      }
+      command_makeDirectory(argv[2]);
+    }
+    else
+    {
+      printf("ERROR: Invalid number of arguements provided\n");
+    }
+  }
+  else if (strcmp(argv[1], "RM") == 0)
+  {
+    if (argsCount == 3)
+    {
+      if (argv[2][0] == '.' || argv[2][0] == '/')
+      {
+        printf("ERROR: Invalid arguements provided\n");
+      }
+      command_remove(argv[2]);
+    }
+    else
+    {
+      printf("ERROR: Invalid number of arguements provided\n");
+    }
+  }
+  else
+  {
+    printf("ERROR: Invalid command provided\n");
   }
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+  if (argc > 4)
+  {
+    printf("Incorrect number of arguements supplied\n");
+    return 0;
+  }
+
+  if (strcmp(argv[1], "GET") != 0 &&
+      strcmp(argv[1], "INFO") != 0 &&
+      strcmp(argv[1], "PUT") != 0 &&
+      strcmp(argv[1], "MD") != 0 &&
+      strcmp(argv[1], "RM") != 0)
+  {
+    printf("Incorrect command provided!: %s\n", argv[1]);
+    return 0;
+  }
+
   // Initialize client socket:
   init_initClient();
 
@@ -573,7 +521,7 @@ int main(void)
   client_connect();
 
   // Get text message to send to server:
-  client_getCommand();
+  client_parseCommand(argc, argv);
 
   // Closing client socket:
   client_closeClientSocket();

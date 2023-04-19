@@ -26,9 +26,9 @@
 #pragma region Config
 
 // Server config
+#define SERVER_MESSAGE_SIZE 2000
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 2000
-#define SERVER_MESSAGE_SIZE 2000
 
 // client config
 #define CLIENT_MESSAGE_SIZE 2000

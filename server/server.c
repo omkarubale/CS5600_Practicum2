@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <ftw.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "../common/common.h"
 #include "configserver.h"
 
@@ -25,6 +26,7 @@ int socket_desc, client_sock;
 socklen_t client_size;
 struct sockaddr_in server_addr, client_addr;
 
+/// @brief Closes the server socket.
 void server_closeServerSocket()
 {
   close(client_sock);
@@ -33,8 +35,16 @@ void server_closeServerSocket()
   exit(1);
 }
 
+/// @brief Closes the client sockets connected to the server.
+void server_closeClientSocket()
+{
+  close(client_sock);
+}
+
 #pragma region Init
 
+/// @brief Initializes the socket when the server goes up.
+/// @return 0 if socket creation is successful, -1 otherwise.
 int init_createServerSocket()
 {
   // Create socket:
@@ -50,6 +60,8 @@ int init_createServerSocket()
   return 0;
 }
 
+/// @brief Binds the server socket to the port.
+/// @return 0 in case of successful binding. -1 otherwise.
 int init_bindServerSocket()
 {
   // Set port and IP:
@@ -68,6 +80,8 @@ int init_bindServerSocket()
   return 0;
 }
 
+/// @brief Initialises a root directory, if not existing already, representing the server file space.
+/// @return 0 if successful, -1 otherwise.
 int init_createRootDirectory()
 {
   struct stat st = {0};
@@ -86,6 +100,8 @@ int init_createRootDirectory()
   return 0;
 }
 
+/// @brief Initialises the server. Creates and binds socket to a port and creates root directory.
+/// @return 0 if process is successful. -1 otherwise.
 int initServer()
 {
   int status;
@@ -106,6 +122,8 @@ int initServer()
 
 #pragma region Communication
 
+/// @brief Sends a message to the client.
+/// @param server_message represents the server message.
 void server_sendMessageToClient(char *server_message)
 {
   printf("SENDING TO CLIENT: %s\n", server_message);
@@ -116,6 +134,8 @@ void server_sendMessageToClient(char *server_message)
   }
 }
 
+/// @brief Receives a message from the client.
+/// @param client_message represents the received client message.
 void server_recieveMessageFromClient(char *client_message)
 {
   // Receive the server's response:
@@ -132,6 +152,9 @@ void server_recieveMessageFromClient(char *client_message)
 
 #pragma region Helpers
 
+/// @brief Checks the existence of a directory in the server space.
+/// @param path represents the directory path that needs to be examined for existence.
+/// @return true if the directory exists, false otherwise.
 bool isDirectoryExists(const char *path)
 {
   struct stat stats;
@@ -145,6 +168,9 @@ bool isDirectoryExists(const char *path)
   return false;
 }
 
+/// @brief Checks the existence of a file.
+/// @param filename represents the file path that needs to be checked.
+/// @return true if the file exists, false otherwise.
 bool isFileExists(const char *filename)
 {
   FILE *fp = fopen(filename, "r");
@@ -176,6 +202,9 @@ int rmrf(char *path)
 
 #pragma region Commands
 
+/// @brief To receive a file from client to the server.
+/// @param remote_file_path represents the path in server space where the received file needs to be stored.
+/// @param local_file_path is the path of original file in client space.
 void command_get(char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
@@ -287,6 +316,8 @@ void command_get(char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET complete\n\n");
 }
 
+/// @brief Gives the relevant information for a file.
+/// @param remote_file_path is the path of the file.
 void command_info(char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
@@ -332,7 +363,9 @@ void command_info(char *remote_file_path)
     {
       printf("INFO: Directory/File Information Retrieval successful\n");
 
+      printf("TEST: %s", response_message);
       strcat(response_message, "S:200 Information Retrieval successful\n");
+      printf("TEST2: %s", response_message);
       char temp[2000];
       memset(temp, '\0', sizeof(temp));
 
@@ -340,9 +373,9 @@ void command_info(char *remote_file_path)
       strcat(response_message, temp);
       sprintf(temp, "File size:                %lld bytes\n", (long long)sb.st_size);
       strcat(response_message, temp);
-      sprintf(temp, "Last file access:         %ld", sb.st_atime);
+      sprintf(temp, "Last file access:         %s", ctime(&sb.st_atime));
       strcat(response_message, temp);
-      sprintf(temp, "Last file modification:   %ld", sb.st_mtime);
+      sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
       strcat(response_message, temp);
 
       server_sendMessageToClient(response_message);
@@ -352,6 +385,8 @@ void command_info(char *remote_file_path)
   printf("COMMAND: INFO complete\n\n");
 }
 
+/// @brief Creates a directory in the server.
+/// @param folder_path represents the path of the directory to be created.
 void command_makeDirectory(char *folder_path)
 {
   printf("COMMAND: MD started\n");
@@ -407,6 +442,9 @@ void command_makeDirectory(char *folder_path)
   printf("COMMAND: MD complete\n\n");
 }
 
+/// @brief To create and store a replica of a local client file to server space.
+/// @param local_file_path is the path of the local file.
+/// @param remote_file_path is the path in server where the replica needs to be saved.
 void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
@@ -492,6 +530,8 @@ void command_put(char *local_file_path, char *remote_file_path)
   printf("COMMAND: PUT complete\n\n");
 }
 
+/// @brief Removes the indicated file/directory.
+/// @param path represents the path of the file/directory to be removed.
 void command_remove(char *path)
 {
   printf("COMMAND: RM started\n");
@@ -587,6 +627,8 @@ void command_remove(char *path)
 
 #pragma endregion Commands
 
+/// @brief Listens and server for incoming client connections.
+/// @return 0 if slient connection to server is successful, -1 otherwise. 
 int server_listenForClients()
 {
   if (listen(socket_desc, 1) < 0)
@@ -611,107 +653,105 @@ int server_listenForClients()
   return 0;
 }
 
+/// @brief Listens for any incoming commands from the client, parses them and delegates the control to appropriate functions.
+///          The server functions are not directly exposed to the client and all control passes through this method.
 void server_listenForCommand()
 {
-  while (true)
+  char client_command[CLIENT_COMMAND_SIZE];
+  memset(client_command, 0, sizeof(client_command));
+  if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
   {
-    char client_command[CLIENT_COMMAND_SIZE];
-    memset(client_command, 0, sizeof(client_command));
-    if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
+    printf("ERROR: Couldn't receive\n");
+    server_closeServerSocket();
+  }
+
+  printf("Msg from client: %s\n", client_command);
+
+  // Interpret entered command
+  char *pch;
+  pch = strtok(client_command, " \n");
+
+  char *args[3];
+
+  args[0] = pch;
+  pch = strtok(NULL, " \n");
+
+  // Set arguement Limits based on first argument
+  int argcLimit;
+  int argc = 1;
+
+  if (strcmp(args[0], "C:001") == 0)
+  {
+    argcLimit = 3;
+  }
+  else if (strcmp(args[0], "C:002") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:003") == 0)
+  {
+    argcLimit = 3;
+  }
+  else if (strcmp(args[0], "C:004") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:005") == 0)
+  {
+    argcLimit = 2;
+  }
+  else if (strcmp(args[0], "C:999") == 0)
+  {
+    argcLimit = 1;
+  }
+  else
+  {
+    printf("ERROR: Invalid command provided\n");
+    server_sendMessageToClient("E:404 Invalid command");
+  }
+
+  // Parse remaining arguements based on set command
+
+  while (pch != NULL)
+  {
+    if (argc >= argcLimit)
     {
-      printf("ERROR: Couldn't receive\n");
-      server_closeServerSocket();
+      printf("ERROR: Invalid number of arguements provided\n");
     }
 
-    printf("Msg from client: %s\n", client_command);
-
-    // Interpret entered command
-    char *pch;
-    pch = strtok(client_command, " \n");
-
-    char *args[3];
-
-    args[0] = pch;
+    args[argc++] = pch;
     pch = strtok(NULL, " \n");
+  }
 
-    // Set arguement Limits based on first argument
-    int argcLimit;
-    int argc = 1;
-
-    if (strcmp(args[0], "C:001") == 0)
-    {
-      argcLimit = 3;
-    }
-    else if (strcmp(args[0], "C:002") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:003") == 0)
-    {
-      argcLimit = 3;
-    }
-    else if (strcmp(args[0], "C:004") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:005") == 0)
-    {
-      argcLimit = 2;
-    }
-    else if (strcmp(args[0], "C:999") == 0)
-    {
-      argcLimit = 1;
-    }
-    else
-    {
-      printf("ERROR: Invalid command provided\n");
-      server_sendMessageToClient("E:404 Invalid command");
-      continue;
-    }
-
-    // Parse remaining arguements based on set command
-
-    while (pch != NULL)
-    {
-      if (argc >= argcLimit)
-      {
-        printf("ERROR: Invalid number of arguements provided\n");
-      }
-
-      args[argc++] = pch;
-      pch = strtok(NULL, " \n");
-    }
-
-    // Redirect to correct command
-    if (strcmp(args[0], "C:001") == 0)
-    {
-      command_get(args[1], args[2]);
-    }
-    else if (strcmp(args[0], "C:002") == 0)
-    {
-      command_info(args[1]);
-    }
-    else if (strcmp(args[0], "C:003") == 0)
-    {
-      command_put(args[1], args[2]);
-    }
-    else if (strcmp(args[0], "C:004") == 0)
-    {
-      command_makeDirectory(args[1]);
-    }
-    else if (strcmp(args[0], "C:005") == 0)
-    {
-      command_remove(args[1]);
-    }
-    else if (strcmp(args[0], "C:999") == 0)
-    {
-      printf("QUIT: Client quiting\n");
-      return;
-    }
-    else
-    {
-      printf("ERROR: Invalid command provided\n");
-    }
+  // Redirect to correct command
+  if (strcmp(args[0], "C:001") == 0)
+  {
+    command_get(args[1], args[2]);
+  }
+  else if (strcmp(args[0], "C:002") == 0)
+  {
+    command_info(args[1]);
+  }
+  else if (strcmp(args[0], "C:003") == 0)
+  {
+    command_put(args[1], args[2]);
+  }
+  else if (strcmp(args[0], "C:004") == 0)
+  {
+    command_makeDirectory(args[1]);
+  }
+  else if (strcmp(args[0], "C:005") == 0)
+  {
+    command_remove(args[1]);
+  }
+  else if (strcmp(args[0], "C:999") == 0)
+  {
+    printf("QUIT: Client quiting\n");
+    return;
+  }
+  else
+  {
+    printf("ERROR: Invalid command provided\n");
   }
 }
 
@@ -723,13 +763,16 @@ int main(void)
   if (status != 0)
     return 0;
 
-  // Listen for clients:
-  status = server_listenForClients();
-  if (status != 0)
-    return 0;
+  while (true)
+  {
+    // Listen for clients:
+    status = server_listenForClients();
+    if (status != 0)
+      return 0;
 
-  // Receive client's message:
-  server_listenForCommand();
+    // Receive client's message:
+    server_listenForCommand();
+  }
 
   // Closing server socket:
   server_closeServerSocket();
