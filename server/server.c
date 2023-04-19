@@ -23,8 +23,7 @@
 #define ROOT_DIRECTORY "./root"
 
 int socket_desc;
-socklen_t client_size;
-struct sockaddr_in server_addr, client_addr;
+struct sockaddr_in server_addr;
 
 void server_closeServerSocket()
 {
@@ -605,6 +604,9 @@ int server_listenForClients()
     return -1;
   }
   printf("\nListening for incoming connections.....\n");
+
+  socklen_t client_size;
+  struct sockaddr_in client_addr;
 
   // Accept an incoming connection:
   client_size = sizeof(client_addr);
