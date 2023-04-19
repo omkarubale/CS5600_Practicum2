@@ -15,6 +15,7 @@
 #include <ftw.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <pthread.h>
 #include "../common/common.h"
 #include "configserver.h"
 
@@ -22,16 +23,20 @@
 
 // #define ROOT_DIRECTORY "./root"
 
-int socket_desc, client_sock;
-socklen_t client_size;
-struct sockaddr_in server_addr, client_addr;
+int socket_desc;
+struct sockaddr_in server_addr;
+
+pthread_mutex_t command_mutex;
 
 /// @brief Closes the server socket.
 void server_closeServerSocket()
 {
-  close(client_sock);
   close(socket_desc);
-  printf("EXIT: closing server socket\n");
+  printf("EXIT: closed server socket\n");
+
+  pthread_mutex_destroy(&command_mutex);
+  printf("EXIT: destroyed command mutex\n");
+
   exit(1);
 }
 
@@ -100,6 +105,16 @@ int init_createRootDirectory()
   return 0;
 }
 
+int init_createCommandMutex()
+{
+  if (pthread_mutex_init(&command_mutex, NULL) != 0)
+  {
+    printf("INIT ERROR: output file mutex init failed\n");
+    return -1;
+  }
+  return 0;
+}
+
 /// @brief Initialises the server. Creates and binds socket to a port and creates root directory.
 /// @return 0 if process is successful. -1 otherwise.
 int initServer()
@@ -114,6 +129,9 @@ int initServer()
   status = init_createRootDirectory();
   if (status != 0)
     return -1;
+  status = init_createCommandMutex();
+  if (status != 0)
+    return -1;
 
   return 0;
 }
@@ -123,8 +141,9 @@ int initServer()
 #pragma region Communication
 
 /// @brief Sends a message to the client.
+/// @param client_sock is the socket of the client the message is to be sent to.
 /// @param server_message represents the server message.
-void server_sendMessageToClient(char *server_message)
+void server_sendMessageToClient(int client_sock, char *server_message)
 {
   printf("SENDING TO CLIENT: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
@@ -134,9 +153,15 @@ void server_sendMessageToClient(char *server_message)
   }
 }
 
+
+/// @brief 
+/// @param client_message 
+
+
 /// @brief Receives a message from the client.
+/// @param client_sock is the socket of the client the message is to be received from.
 /// @param client_message represents the received client message.
-void server_recieveMessageFromClient(char *client_message)
+void server_recieveMessageFromClient(int client_sock, char *client_message)
 {
   // Receive the server's response:
   if (recv(client_sock, client_message, CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE, 0) < 0)
@@ -205,9 +230,12 @@ int rmrf(char *path)
 /// @brief To receive a file from client to the server.
 /// @param remote_file_path represents the path in server space where the received file needs to be stored.
 /// @param local_file_path is the path of original file in client space.
-void command_get(char *remote_file_path, char *local_file_path)
+void command_get(int client_sock, char *remote_file_path, char *local_file_path)
 {
   printf("COMMAND: GET started\n");
+
+  pthread_mutex_lock(&command_mutex);
+
   FILE *remote_file;
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
@@ -230,7 +258,7 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "File not found on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -240,14 +268,14 @@ void command_get(char *remote_file_path, char *local_file_path)
     strcat(response_message, "S:200 ");
     strcat(response_message, "File found on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
     memset(response_message, 0, sizeof(response_message));
 
     // recieve client's first response
     char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
     memset(client_message, '\0', sizeof(client_message));
 
-    server_recieveMessageFromClient(client_message);
+    server_recieveMessageFromClient(client_sock, client_message);
 
     if (strncmp(client_message, "S:100", CODE_SIZE) == 0)
     {
@@ -279,11 +307,11 @@ void command_get(char *remote_file_path, char *local_file_path)
 
           memset(buffer, 0, sizeof(buffer));
 
-          server_sendMessageToClient(response_message);
+          server_sendMessageToClient(client_sock, response_message);
 
           memset(client_message, '\0', sizeof(client_message));
 
-          server_recieveMessageFromClient(client_message);
+          server_recieveMessageFromClient(client_sock, client_message);
         }
         else
         {
@@ -294,7 +322,7 @@ void command_get(char *remote_file_path, char *local_file_path)
           strcat(response_message, "S:200 ");
           strcat(response_message, "File sent successfully");
 
-          server_sendMessageToClient(response_message);
+          server_sendMessageToClient(client_sock, response_message);
           break;
         }
       }
@@ -306,21 +334,30 @@ void command_get(char *remote_file_path, char *local_file_path)
       strcat(response_message, "E:500 ");
       strcat(response_message, "The client did not agree to receive the file contents.");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
 
       printf("GET: The client did not agree to receive the file contents.\n");
     }
   }
 
   fclose(remote_file);
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: GET complete\n\n");
 }
 
+/// @brief 
+/// @param remote_file_path 
+
+
 /// @brief Gives the relevant information for a file.
-/// @param remote_file_path is the path of the file.
-void command_info(char *remote_file_path)
+/// @param client_sock is the socket of the client which is requesting the information.
+/// @param remote_file_path is the path of the file whose information is requested.
+void command_info(int client_sock, char *remote_file_path)
 {
   printf("COMMAND: INFO started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -340,7 +377,7 @@ void command_info(char *remote_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File doesn't exist");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -357,7 +394,7 @@ void command_info(char *remote_file_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory/File Information Retrieval failed");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
     else
     {
@@ -378,18 +415,28 @@ void command_info(char *remote_file_path)
       sprintf(temp, "Last file modification:   %s", ctime(&sb.st_mtime));
       strcat(response_message, temp);
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
+
+  pthread_mutex_unlock(&command_mutex);
 
   printf("COMMAND: INFO complete\n\n");
 }
 
+<<<<<<< HEAD
+/// @brief 
+/// @param folder_path 
+
+
 /// @brief Creates a directory in the server.
+/// @param client_sock represents the socket of the client that is requesting the command.
 /// @param folder_path represents the path of the directory to be created.
-void command_makeDirectory(char *folder_path)
+void command_makeDirectory(int client_sock, char *folder_path)
 {
   printf("COMMAND: MD started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -409,7 +456,7 @@ void command_makeDirectory(char *folder_path)
     strcat(response_message, "E:406 ");
     strcat(response_message, "Directory already exists");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -425,7 +472,7 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "E:406 ");
       strcat(response_message, "Directory creation failed");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
     else
     {
@@ -435,19 +482,29 @@ void command_makeDirectory(char *folder_path)
       strcat(response_message, "S:200 ");
       strcat(response_message, "Directory creation successful");
 
-      server_sendMessageToClient(response_message);
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
+
+  pthread_mutex_unlock(&command_mutex);
 
   printf("COMMAND: MD complete\n\n");
 }
 
+/// @brief 
+/// @param local_file_path 
+/// @param remote_file_path 
+
+
 /// @brief To create and store a replica of a local client file to server space.
+/// @param client_sock is the socket of the client that is requesting the command.
 /// @param local_file_path is the path of the local file.
 /// @param remote_file_path is the path in server where the replica needs to be saved.
-void command_put(char *local_file_path, char *remote_file_path)
+void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   // prepare the file to write into
   FILE *remote_file;
@@ -470,7 +527,7 @@ void command_put(char *local_file_path, char *remote_file_path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "File could not be opened. Please check whether the location exists.");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -478,10 +535,10 @@ void command_put(char *local_file_path, char *remote_file_path)
     strcat(response_message, "S:100 ");
     strcat(response_message, "Ready to write file on server");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
 
     // get first block from client
-    server_recieveMessageFromClient(client_message);
+    server_recieveMessageFromClient(client_sock, client_message);
 
     while (true)
     {
@@ -498,11 +555,11 @@ void command_put(char *local_file_path, char *remote_file_path)
         strcat(response_message, "S:100 ");
         strcat(response_message, "Success Continue");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
 
         // get next block from client
         memset(client_message, 0, sizeof(client_message));
-        server_recieveMessageFromClient(client_message);
+        server_recieveMessageFromClient(client_sock, client_message);
       }
       else if (strncmp(client_message, "E:500", CODE_SIZE) == 0)
       {
@@ -516,7 +573,7 @@ void command_put(char *local_file_path, char *remote_file_path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "File received successfully");
 
-        server_sendMessageToClient(client_message);
+        server_sendMessageToClient(client_sock, client_message);
 
         printf("PUT: File received successfully\n");
 
@@ -527,14 +584,19 @@ void command_put(char *local_file_path, char *remote_file_path)
     fclose(remote_file);
   }
 
+  pthread_mutex_unlock(&command_mutex);
+
   printf("COMMAND: PUT complete\n\n");
 }
 
 /// @brief Removes the indicated file/directory.
+/// @param client_sock represents the socket of the client that is requesting the command
 /// @param path represents the path of the file/directory to be removed.
-void command_remove(char *path)
+void command_remove(int client_sock, char *path)
 {
   printf("COMMAND: RM started\n");
+
+  pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
@@ -556,7 +618,7 @@ void command_remove(char *path)
     strcat(response_message, "E:404 ");
     strcat(response_message, "Directory/File Not Found");
 
-    server_sendMessageToClient(response_message);
+    server_sendMessageToClient(client_sock, response_message);
   }
   else
   {
@@ -574,7 +636,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "File Removal failed");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
       else
       {
@@ -584,7 +646,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "File Removal successful");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
     }
     else if (S_ISDIR(sb.st_mode))
@@ -600,7 +662,7 @@ void command_remove(char *path)
         strcat(response_message, "E:406 ");
         strcat(response_message, "Directory Removal failed");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
       else
       {
@@ -610,7 +672,7 @@ void command_remove(char *path)
         strcat(response_message, "S:200 ");
         strcat(response_message, "Directory Removal successful");
 
-        server_sendMessageToClient(response_message);
+        server_sendMessageToClient(client_sock, response_message);
       }
     }
     else
@@ -619,8 +681,12 @@ void command_remove(char *path)
       printf("RM ERROR: Given path is not supported\n");
       strcat(response_message, "E:406 ");
       strcat(response_message, "Given path is not supported");
+
+      server_sendMessageToClient(client_sock, response_message);
     }
   }
+
+  pthread_mutex_unlock(&command_mutex);
 
   printf("COMMAND: RM complete\n\n");
 }
@@ -639,9 +705,12 @@ int server_listenForClients()
   }
   printf("\nListening for incoming connections.....\n");
 
+  socklen_t client_size;
+  struct sockaddr_in client_addr;
+
   // Accept an incoming connection:
   client_size = sizeof(client_addr);
-  client_sock = accept(socket_desc, (struct sockaddr *)&client_addr, &client_size);
+  int client_sock = accept(socket_desc, (struct sockaddr *)&client_addr, &client_size);
 
   if (client_sock < 0)
   {
@@ -649,23 +718,38 @@ int server_listenForClients()
     server_closeServerSocket();
     return -1;
   }
-  printf("Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-  return 0;
+  printf("CLIENT CONNECTION: Client connected at IP: %s and port: %i\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+  printf("CLIENT CONNECTION: Client socket: %d\n", client_sock);
+  return client_sock;
 }
+
+<<<<<<< HEAD
+
+
 
 /// @brief Listens for any incoming commands from the client, parses them and delegates the control to appropriate functions.
 ///          The server functions are not directly exposed to the client and all control passes through this method.
-void server_listenForCommand()
+/// @param client_sock_arg represnts the socket of the incoming client for connection.
+/// @return NULL when the server terminates.
+void *server_listenForCommand(void *client_sock_arg)
 {
+  int client_sock = *((int *)client_sock_arg);
+  free(client_sock_arg);
+
   char client_command[CLIENT_COMMAND_SIZE];
   memset(client_command, 0, sizeof(client_command));
+
+  printf("LISTEN: listening for command from client socket: %d\n", client_sock);
+
   if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
   {
-    printf("ERROR: Couldn't receive\n");
-    server_closeServerSocket();
+    printf("LISTEN ERROR: Couldn't listen for command\n");
+    server_closeClientSocket(client_sock);
+
+    return NULL;
   }
 
-  printf("Msg from client: %s\n", client_command);
+  printf("LISTEN: Message from client: %s\n", client_command);
 
   // Interpret entered command
   char *pch;
@@ -700,14 +784,10 @@ void server_listenForCommand()
   {
     argcLimit = 2;
   }
-  else if (strcmp(args[0], "C:999") == 0)
-  {
-    argcLimit = 1;
-  }
   else
   {
-    printf("ERROR: Invalid command provided\n");
-    server_sendMessageToClient("E:404 Invalid command");
+    printf("LISTEN ERROR: Invalid command provided\n");
+    server_sendMessageToClient(client_sock, "E:404 Invalid command");
   }
 
   // Parse remaining arguements based on set command
@@ -716,7 +796,7 @@ void server_listenForCommand()
   {
     if (argc >= argcLimit)
     {
-      printf("ERROR: Invalid number of arguements provided\n");
+      printf("LISTEN ERROR: Invalid number of arguements provided\n");
     }
 
     args[argc++] = pch;
@@ -726,33 +806,33 @@ void server_listenForCommand()
   // Redirect to correct command
   if (strcmp(args[0], "C:001") == 0)
   {
-    command_get(args[1], args[2]);
+    command_get(client_sock, args[1], args[2]);
   }
   else if (strcmp(args[0], "C:002") == 0)
   {
-    command_info(args[1]);
+    command_info(client_sock, args[1]);
   }
   else if (strcmp(args[0], "C:003") == 0)
   {
-    command_put(args[1], args[2]);
+    command_put(client_sock, args[1], args[2]);
   }
   else if (strcmp(args[0], "C:004") == 0)
   {
-    command_makeDirectory(args[1]);
+    command_makeDirectory(client_sock, args[1]);
   }
   else if (strcmp(args[0], "C:005") == 0)
   {
-    command_remove(args[1]);
-  }
-  else if (strcmp(args[0], "C:999") == 0)
-  {
-    printf("QUIT: Client quiting\n");
-    return;
+    command_remove(client_sock, args[1]);
   }
   else
   {
-    printf("ERROR: Invalid command provided\n");
+    printf("LISTEN ERROR: Invalid command provided\n");
   }
+
+  printf("LISTEN: Closing connection for client socket %d\n", client_sock);
+  server_closeClientSocket(client_sock);
+
+  return NULL;
 }
 
 int main(void)
@@ -766,12 +846,32 @@ int main(void)
   while (true)
   {
     // Listen for clients:
-    status = server_listenForClients();
-    if (status != 0)
-      return 0;
+    int client_sock = server_listenForClients();
+    if (client_sock < 0)
+    {
+      printf("CLIENT CONNECTION ERROR: Client could not be connected\n");
+      continue;
+    }
 
-    // Receive client's message:
-    server_listenForCommand();
+    // Create a new detached thread to serve client's message:
+    pthread_t thread_for_client_request;
+    pthread_attr_t attr;
+
+    // detach thread so that it can end without having to join it here again
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    int *arg = malloc(sizeof(*arg));
+    if (arg == NULL)
+    {
+      fprintf(stderr, "CLIENT CONNECTION ERROR: Couldn't allocate memory for thread arguments.\n");
+      exit(EXIT_FAILURE);
+    }
+
+    *arg = client_sock;
+
+    // start listening for command from client
+    pthread_create(&thread_for_client_request, NULL, server_listenForCommand, arg);
   }
 
   // Closing server socket:
