@@ -137,7 +137,7 @@ void server_recieveMessageFromClient(char *client_message)
 
 #pragma region Helpers
 
-int isDirectoryExists(const char *path)
+bool isDirectoryExists(const char *path)
 {
   struct stat stats;
 
@@ -145,9 +145,21 @@ int isDirectoryExists(const char *path)
 
   // Check for file existence
   if (S_ISDIR(stats.st_mode))
-    return 1;
+    return true;
 
-  return 0;
+  return false;
+}
+
+bool isFileExists(const char *filename)
+{
+  FILE *fp = fopen(filename, "r");
+  bool is_exist = false;
+  if (fp != NULL)
+  {
+    is_exist = true;
+    fclose(fp); // close the file
+  }
+  return is_exist;
 }
 
 int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
@@ -291,7 +303,7 @@ void command_info(char *remote_file_path)
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
 
-  if (!isDirectoryExists(actual_path))
+  if (!isDirectoryExists(actual_path) && !isFileExists(actual_path))
   {
     // directory doesn't exist
     printf("INFO: Directory/File doesn't exist\n");
