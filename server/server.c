@@ -41,7 +41,7 @@ void server_closeServerSocket()
 }
 
 /// @brief Closes the client sockets connected to the server.
-void server_closeClientSocket()
+void server_closeClientSocket(int client_sock)
 {
   close(client_sock);
 }
@@ -153,10 +153,8 @@ void server_sendMessageToClient(int client_sock, char *server_message)
   }
 }
 
-
-/// @brief 
-/// @param client_message 
-
+/// @brief
+/// @param client_message
 
 /// @brief Receives a message from the client.
 /// @param client_sock is the socket of the client the message is to be received from.
@@ -346,9 +344,8 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET complete\n\n");
 }
 
-/// @brief 
-/// @param remote_file_path 
-
+/// @brief
+/// @param remote_file_path
 
 /// @brief Gives the relevant information for a file.
 /// @param client_sock is the socket of the client which is requesting the information.
@@ -424,11 +421,6 @@ void command_info(int client_sock, char *remote_file_path)
   printf("COMMAND: INFO complete\n\n");
 }
 
-<<<<<<< HEAD
-/// @brief 
-/// @param folder_path 
-
-
 /// @brief Creates a directory in the server.
 /// @param client_sock represents the socket of the client that is requesting the command.
 /// @param folder_path represents the path of the directory to be created.
@@ -491,10 +483,9 @@ void command_makeDirectory(int client_sock, char *folder_path)
   printf("COMMAND: MD complete\n\n");
 }
 
-/// @brief 
-/// @param local_file_path 
-/// @param remote_file_path 
-
+/// @brief
+/// @param local_file_path
+/// @param remote_file_path
 
 /// @brief To create and store a replica of a local client file to server space.
 /// @param client_sock is the socket of the client that is requesting the command.
@@ -694,7 +685,7 @@ void command_remove(int client_sock, char *path)
 #pragma endregion Commands
 
 /// @brief Listens and server for incoming client connections.
-/// @return 0 if slient connection to server is successful, -1 otherwise. 
+/// @return 0 if slient connection to server is successful, -1 otherwise.
 int server_listenForClients()
 {
   if (listen(socket_desc, 1) < 0)
@@ -722,10 +713,6 @@ int server_listenForClients()
   printf("CLIENT CONNECTION: Client socket: %d\n", client_sock);
   return client_sock;
 }
-
-<<<<<<< HEAD
-
-
 
 /// @brief Listens for any incoming commands from the client, parses them and delegates the control to appropriate functions.
 ///          The server functions are not directly exposed to the client and all control passes through this method.
