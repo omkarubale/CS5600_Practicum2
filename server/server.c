@@ -23,8 +23,6 @@
 int socket_desc, client_sock;
 socklen_t client_size;
 struct sockaddr_in server_addr, client_addr;
-char server_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE], client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
-char client_command[CLIENT_COMMAND_SIZE];
 
 void server_closeServerSocket()
 {
@@ -38,10 +36,6 @@ void server_closeServerSocket()
 
 int init_createServerSocket()
 {
-  // Clean buffers:
-  memset(server_message, '\0', sizeof(server_message));
-  memset(client_message, '\0', sizeof(client_message));
-
   // Create socket:
   socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -192,7 +186,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
-  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
+  strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
   remote_file = fopen(actual_path, "r");
   printf("GET: Looking for file: %s\n", actual_path);
@@ -231,6 +225,7 @@ void command_get(char *remote_file_path, char *local_file_path)
       // Send file data to client
       printf("GET: Client hinted at sending file contents.\n");
       char buffer[SERVER_MESSAGE_SIZE];
+      memset(buffer, 0, sizeof(buffer));
       int bytes_read;
       int bytesReadSoFar = 0;
 
@@ -251,6 +246,8 @@ void command_get(char *remote_file_path, char *local_file_path)
 
           strcat(response_message, "S:206 ");
           strncat(response_message, buffer, bytes_read);
+
+          memset(buffer, 0, sizeof(buffer));
 
           server_sendMessageToClient(response_message);
 
@@ -286,7 +283,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   }
 
   fclose(remote_file);
-  printf("COMMAND: GET complete\n");
+  printf("COMMAND: GET complete\n\n");
 }
 
 void command_info(char *remote_file_path)
@@ -296,7 +293,7 @@ void command_info(char *remote_file_path)
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
-  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
+  strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
   printf("INFO: actual path: %s\n", actual_path);
 
@@ -351,7 +348,7 @@ void command_info(char *remote_file_path)
     }
   }
 
-  printf("COMMAND: INFO complete\n");
+  printf("COMMAND: INFO complete\n\n");
 }
 
 void command_makeDirectory(char *folder_path)
@@ -361,7 +358,7 @@ void command_makeDirectory(char *folder_path)
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
-  strncat(actual_path, folder_path, strlen(folder_path) - 1);
+  strncat(actual_path, folder_path, strlen(folder_path));
 
   printf("MD: actual path: %s\n", actual_path);
 
@@ -413,74 +410,83 @@ void command_put(char *local_file_path, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
-  // Tell client that server is ready to recieve the file
-  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
-  memset(response_message, 0, sizeof(response_message));
-  char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
-  memset(client_message, 0, sizeof(client_message));
-
-  strcat(response_message, "S:100 ");
-  strcat(response_message, "Ready to write file on server");
-
-  server_sendMessageToClient(response_message);
-
   // prepare the file to write into
   FILE *remote_file;
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
-  strncat(actual_path, remote_file_path, strlen(remote_file_path) - 1);
+  strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
   remote_file = fopen(actual_path, "w");
 
-  // get first block from client
-  server_recieveMessageFromClient(client_message);
+  char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(response_message, 0, sizeof(response_message));
+  char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
+  memset(client_message, 0, sizeof(client_message));
 
-  char buffer[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
-  int bytes_received;
-
-  while (true)
+  if (remote_file == NULL)
   {
-    if (strncmp(client_message, "S:206", CODE_SIZE) == 0)
-    {
-      char *file_contents;
-      file_contents = client_message + CODE_SIZE + CODE_PADDING;
+    printf("PUT ERROR: File could not be opened. Please check whether the location exists.\n");
 
-      printf("PUT: Writing to file: %s\n", file_contents);
+    strcat(response_message, "E:404 ");
+    strcat(response_message, "File could not be opened. Please check whether the location exists.");
 
-      fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file);
-
-      memset(response_message, 0, sizeof(response_message));
-      strcat(response_message, "S:100 ");
-      strcat(response_message, "Success Continue");
-
-      server_sendMessageToClient(response_message);
-
-      // get next block from client
-      memset(client_message, 0, sizeof(client_message));
-      server_recieveMessageFromClient(client_message);
-    }
-    else if (strncmp(client_message, "E:500", CODE_SIZE) == 0)
-    {
-      printf("PUT ERROR: File could not be recieved\n");
-
-      break;
-    }
-    else if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
-    {
-      memset(response_message, 0, sizeof(response_message));
-      strcat(response_message, "S:200 ");
-      strcat(response_message, "File received successfully");
-
-      server_sendMessageToClient(client_message);
-
-      printf("PUT: File received successfully\n");
-
-      break;
-    }
+    server_sendMessageToClient(response_message);
   }
+  else
+  {
+    // Tell client that server is ready to recieve the file
+    strcat(response_message, "S:100 ");
+    strcat(response_message, "Ready to write file on server");
 
-  fclose(remote_file);
+    server_sendMessageToClient(response_message);
+
+    // get first block from client
+    server_recieveMessageFromClient(client_message);
+
+    while (true)
+    {
+      if (strncmp(client_message, "S:206", CODE_SIZE) == 0)
+      {
+        char *file_contents;
+        file_contents = client_message + CODE_SIZE + CODE_PADDING;
+
+        printf("PUT: Writing to file: %s\n", file_contents);
+
+        fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file);
+
+        memset(response_message, 0, sizeof(response_message));
+        strcat(response_message, "S:100 ");
+        strcat(response_message, "Success Continue");
+
+        server_sendMessageToClient(response_message);
+
+        // get next block from client
+        memset(client_message, 0, sizeof(client_message));
+        server_recieveMessageFromClient(client_message);
+      }
+      else if (strncmp(client_message, "E:500", CODE_SIZE) == 0)
+      {
+        printf("PUT ERROR: File could not be recieved\n");
+
+        break;
+      }
+      else if (strncmp(client_message, "S:200", CODE_SIZE) == 0)
+      {
+        memset(response_message, 0, sizeof(response_message));
+        strcat(response_message, "S:200 ");
+        strcat(response_message, "File received successfully");
+
+        server_sendMessageToClient(client_message);
+
+        printf("PUT: File received successfully\n");
+
+        break;
+      }
+    }
+
+    fclose(remote_file);
+  }
 
   printf("COMMAND: PUT complete\n\n");
 }
@@ -492,7 +498,7 @@ void command_remove(char *path)
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strcat(actual_path, "/");
-  strncat(actual_path, path, strlen(path) - 1);
+  strncat(actual_path, path, strlen(path));
 
   printf("RM: actual path: %s\n", actual_path);
 
@@ -575,7 +581,7 @@ void command_remove(char *path)
     }
   }
 
-  printf("COMMAND: RM complete\n");
+  printf("COMMAND: RM complete\n\n");
 }
 
 #pragma endregion Commands
@@ -608,6 +614,7 @@ void server_listenForCommand()
 {
   while (true)
   {
+    char client_command[CLIENT_COMMAND_SIZE];
     memset(client_command, 0, sizeof(client_command));
     if (recv(client_sock, client_command, sizeof(client_command), 0) < 0)
     {
@@ -619,12 +626,12 @@ void server_listenForCommand()
 
     // Interpret entered command
     char *pch;
-    pch = strtok(client_command, " ");
+    pch = strtok(client_command, " \n");
 
     char *args[3];
 
     args[0] = pch;
-    pch = strtok(NULL, " ");
+    pch = strtok(NULL, " \n");
 
     // Set arguement Limits based on first argument
     int argcLimit;
@@ -671,7 +678,7 @@ void server_listenForCommand()
       }
 
       args[argc++] = pch;
-      pch = strtok(NULL, " ");
+      pch = strtok(NULL, " \n");
     }
 
     // Redirect to correct command
