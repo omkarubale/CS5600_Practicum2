@@ -114,7 +114,7 @@ void directory_cloneDirectory2IntoDirectory1()
   strcat(command, ROOT_DIRECTORY_1);
 
   directory_acquireDirectory1();
-  directory_acquireDirectory1();
+  directory_acquireDirectory2();
 
   printf("DIRECTORY CLONING: command to be excuted for clone root directory 2 into root directory 1: %s \n", command);
   printf("DIRECTORY CLONING: starting cloning root directory 2 into root directory 1\n");
@@ -137,7 +137,7 @@ void directory_cloneDirectory1IntoDirectory2()
   strcat(command, ROOT_DIRECTORY_2);
 
   directory_acquireDirectory1();
-  directory_acquireDirectory1();
+  directory_acquireDirectory2();
 
   printf("DIRECTORY CLONING: command to be excuted for clone root directory 1 into root directory 2: %s \n", command);
   printf("DIRECTORY CLONING: starting cloning root directory 1 into root directory 2\n");
@@ -357,6 +357,7 @@ bool directory_isDirectory1Init()
       if (isRootDirectory2Init && stat(ROOT_DIRECTORY_2, &st2) == 0)
       {
         // clone directory 2 into directory 1
+        printf("DIRECTORY: triggered cloning directory 2 into directory 1\n");
         directory_cloneDirectory2IntoDirectory1();
 
         isRootDirectory1Init = true;
@@ -420,6 +421,7 @@ bool directory_isDirectory2Init()
       if (isRootDirectory2Init && stat(ROOT_DIRECTORY_1, &st1) == 0)
       {
         // clone directory 1 into directory 2
+        printf("DIRECTORY: triggered cloning directory 1 into directory 2\n");
         directory_cloneDirectory1IntoDirectory2();
 
         isRootDirectory2Init = true;
