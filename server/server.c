@@ -761,17 +761,47 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
   pthread_mutex_lock(&command_mutex);
 
-  char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY_1);
-  strcat(actual_path, "/");
-  strncat(actual_path, folder_path, strlen(folder_path));
+  char actual_path1[200];
+  char actual_path2[200];
 
-  printf("MD: actual path: %s\n", actual_path);
+  if (directory_isDirectory1Init())
+  {
+    printf("GET: Directory 1 is available\n");
+
+    strcpy(actual_path1, ROOT_DIRECTORY_1);
+    strcat(actual_path1, "/");
+    strncat(actual_path1, folder_path, strlen(folder_path));
+
+    pthread_mutex_lock(&root_directory_1_mutex);
+
+    printf("INFO: actual path: %s\n", actual_path1);
+  }
+
+  if (directory_isDirectory2Init())
+  {
+    printf("GET: Directory 2 is available\n");
+
+    strcpy(actual_path2, ROOT_DIRECTORY_2);
+    strcat(actual_path2, "/");
+    strncat(actual_path2, folder_path, strlen(folder_path));
+
+    pthread_mutex_lock(&root_directory_2_mutex);
+
+    printf("INFO: actual path: %s\n", actual_path2);
+  }
+
+  if (!isRootDirectory1Init && !isRootDirectory2Init)
+  {
+    printf("GET ERROR: No Directory is available\n");
+    server_closeServerSocket();
+    exit(1);
+  }
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
 
-  if (isDirectoryExists(actual_path))
+  if ((isRootDirectory1Init && isDirectoryExists(actual_path1)) ||
+      (isRootDirectory2Init && isDirectoryExists(actual_path2)))
   {
     // directory already exists
     printf("MD: Directory already exists\n");
@@ -786,8 +816,9 @@ void command_makeDirectory(int client_sock, char *folder_path)
     // directory doesn't exist
     printf("MD: Directory doesn't exist, creating directory\n");
 
-    int res = mkdir(actual_path, 0700);
-    if (res != 0)
+    int res1 = mkdir(actual_path1, 0700);
+    int res2 = mkdir(actual_path2, 0700);
+    if (res1 != 0 || res2 != 0)
     {
       // creation of directory failed
       printf("MD ERROR: directory creation failed\n");
@@ -807,6 +838,15 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
       server_sendMessageToClient(client_sock, response_message);
     }
+  }
+
+  if (isRootDirectory1Init)
+  {
+    pthread_mutex_unlock(&root_directory_1_mutex);
+  }
+  if (isRootDirectory2Init)
+  {
+    pthread_mutex_unlock(&root_directory_2_mutex);
   }
 
   pthread_mutex_unlock(&command_mutex);
@@ -833,30 +873,32 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 
   if (directory_isDirectory1Init())
   {
-    printf("GET: Directory 1 is available\n");
+    printf("PUT: Directory 1 is available\n");
+
     strcpy(actual_path1, ROOT_DIRECTORY_1);
+    strcat(actual_path1, "/");
+    strncat(actual_path1, remote_file_path, strlen(remote_file_path));
+
+    printf("PUT: actual path: %s\n", actual_path1);
   }
 
   if (directory_isDirectory2Init())
   {
-    printf("GET: Directory 2 is available\n");
+    printf("PUT: Directory 2 is available\n");
+
     strcpy(actual_path2, ROOT_DIRECTORY_2);
+    strcat(actual_path2, "/");
+    strncat(actual_path2, remote_file_path, strlen(remote_file_path));
+
+    printf("PUT: actual path: %s\n", actual_path2);
   }
 
   if (!isRootDirectory1Init && !isRootDirectory2Init)
   {
-    printf("GET ERROR: No Directory is available\n");
+    printf("PUT ERROR: No Directory is available\n");
     server_closeServerSocket();
     exit(1);
   }
-
-  strcat(actual_path1, "/");
-  strcat(actual_path2, "/");
-  strncat(actual_path1, remote_file_path, strlen(remote_file_path));
-  strncat(actual_path2, remote_file_path, strlen(remote_file_path));
-
-  printf("INFO: actual path: %s\n", actual_path1);
-  printf("INFO: actual path: %s\n", actual_path2);
 
   if (isRootDirectory1Init)
   {
