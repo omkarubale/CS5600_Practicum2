@@ -110,7 +110,15 @@ int main()
     // How: rename folder for directory 1 to something different, trigger GET
     //      we will have active directory as Directory 2 now
     //      rename Directory 1 back to original (correct) name
-    //      trigger GET command, and ensure CLONE SUCCESSFUL is found in result
+    //      trigger GET command, and ensure "cloning complete" is found in result
+
+    // Phase 3: Q7 - test cases demonstrate that multi-threading works
+    // How: trigger reads in a for loop so we are sending more requests to the
+    //      server than it can handle one request. Use big files for this so
+    //      server waits for longer per request
+
+    // Phase 4: Q8 - test cases demonstrate that distributed reads work
+    // How: Can be same as Q7 testing if done well
 
     return 0;
 }
