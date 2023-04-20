@@ -125,6 +125,9 @@ void command_get(char *remote_file_path, char *local_file_path)
   }
   else
   {
+    // Connect to server socket:
+    client_connect();
+
     char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
     memset(client_message, 0, sizeof(client_message));
     char server_response[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
@@ -225,6 +228,9 @@ void command_info(char *remote_file_path)
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
   strncat(client_message, remote_file_path, strlen(remote_file_path));
 
+  // Connect to server socket:
+  client_connect();
+
   // send command to server
   client_sendMessageToServer(client_message);
 
@@ -261,6 +267,9 @@ void command_put(char *local_file_path, char *remote_file_path)
   else
   {
     printf("PUT: File Found on client\n");
+
+    // Connect to server socket:
+    client_connect();
 
     char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE];
     memset(client_message, 0, sizeof(client_message));
@@ -364,6 +373,9 @@ void command_makeDirectory(char *folder_path)
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
   strncat(client_message, folder_path, strlen(folder_path));
 
+  // Connect to server socket:
+  client_connect();
+
   // send command to server
   client_sendMessageToServer(client_message);
 
@@ -392,6 +404,9 @@ void command_remove(char *path)
   char code[CODE_SIZE + CODE_PADDING] = "C:005 ";
   strncat(client_message, code, CODE_SIZE + CODE_PADDING);
   strncat(client_message, path, strlen(path));
+
+  // Connect to server socket:
+  client_connect();
 
   // send command to server
   client_sendMessageToServer(client_message);
@@ -510,9 +525,6 @@ int main(int argc, char **argv)
 
   // Initialize client socket:
   init_initClient();
-
-  // Connect to server socket:
-  client_connect();
 
   // Get text message to send to server:
   client_parseCommand(argc, argv);
