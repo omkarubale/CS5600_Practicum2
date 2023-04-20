@@ -79,7 +79,7 @@ int main() {
     printf("Test 5: Testing PUT operation LARGE FILE:\n");
     displayLine();
 
-    sprintf(command, "./fget PUT f1/h1.txt bigFile.txt");
+    sprintf(command, "./fget PUT lorem/loremContent.txt bigFile.txt");
     printCommandOutput(command);
 
     printf("Operation PUT Successful!!\n");
