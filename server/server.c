@@ -803,11 +803,13 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 
   if (isRootDirectory1Init)
   {
+    pthread_mutex_lock(&root_directory_1_mutex);
     remote_file1 = fopen(actual_path1, "w");
   }
 
   if (isRootDirectory2Init)
   {
+    pthread_mutex_lock(&root_directory_2_mutex);
     remote_file2 = fopen(actual_path2, "w");
   }
 
@@ -887,10 +889,12 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
     if (isRootDirectory1Init)
     {
       fclose(remote_file1);
+      pthread_mutex_unlock(&root_directory_1_mutex);
     }
     if (isRootDirectory2Init)
     {
       fclose(remote_file2);
+      pthread_mutex_unlock(&root_directory_2_mutex);
     }
   }
 
