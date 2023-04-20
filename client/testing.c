@@ -64,112 +64,114 @@ int main()
     char command[200];
     printf("----------Starting Testing-----------\n\n");
 
-    // // GET : basic file
-    // printf("Test 1: Testing GET operation:\n");
-    // displayLine();
+    // GET : basic file
+    printf("Test 1: Testing GET operation:\n");
+    displayLine();
 
-    // sprintf(command, "./fget GET h3.txt f1/h2.txt");
+    sprintf(command, "./fget GET h3.txt f1/h2.txt");
+    printCommandOutput(command);
+
+    printf("Operation GET Successful!!\n");
+    displayLine();
+
+    // INFO: basic file
+    printf("Test 2: Testing INFO of a file:\n");
+    displayLine();
+
+    sprintf(command, "./fget INFO h3.txt");
+    printCommandOutput(command);
+
+    printf("Operation INFO Successful!!\n");
+    displayLine();
+
+    // INFO: folder
+    printf("Test 2.1: Testing INFO of a folder:\n");
+    displayLine();
+
+    sprintf(command, "./fget INFO ff");
+    printCommandOutput(command);
+
+    printf("Operation INFO Successful!!\n");
+    displayLine();
+
+    // MD: add newFolder
+    printf("Test 3: Testing MD Command to create a new directory:\n");
+    displayLine();
+
+    sprintf(command, "./fget MD newFolder");
+    printCommandOutput(command);
+
+    printf("Operation MD Successful!!\n");
+    displayLine();
+
+    // PUT: smaller file TODO
+
+    // PUT: large file
+    printf("Test 4: Testing PUT operation LARGE FILE:\n");
+    displayLine();
+
+    sprintf(command, "./fget PUT lorem/loremContent.txt bigFile.txt");
+    system(command);
     // printCommandOutput(command);
 
-    // printf("Operation GET Successful!!\n");
-    // displayLine();
+    printf("Operation PUT Successful!!\n");
+    displayLine();
 
-    // // INFO: basic file
-    // printf("Test 2: Testing INFO of a file:\n");
-    // displayLine();
+    // RM: remove newFolder
+    printf("Test 5: Testing RM Command to remove a directory:\n");
+    displayLine();
 
-    // sprintf(command, "./fget INFO h3.txt");
-    // printCommandOutput(command);
+    sprintf(command, "./fget RM newFolder");
+    printCommandOutput(command);
 
-    // printf("Operation INFO Successful!!\n");
-    // displayLine();
+    printf("Operation RM Successful!!\n");
+    displayLine();
 
-    // // INFO: folder
-    // printf("Test 2.1: Testing INFO of a folder:\n");
-    // displayLine();
+    // RM: remove file TODO
+    printf("Test 6: Testing RM Command to remove a file:\n");
+    displayLine();
 
-    // sprintf(command, "./fget INFO ff");
-    // printCommandOutput(command);
+    sprintf(command, "./fget RM filr.txt");
+    printCommandOutput(command);
 
-    // printf("Operation INFO Successful!!\n");
-    // displayLine();
+    printf("Operation RM Successful!!\n");
+    displayLine();
 
-    // // MD: add newFolder
-    // printf("Test 3: Testing MD Command to create a new directory:\n");
-    // displayLine();
+    // Phase 2: Q6 - test cases demonstrates that mirrors work
+    // How: rename folder for directory 1 to something different, trigger GET
+    //      we will have active directory as Directory 2 now
+    //      rename Directory 1 back to original (correct) name
+    //      trigger GET command, and ensure "cloning complete" is found in result
 
-    // sprintf(command, "./fget MD newFolder");
-    // printCommandOutput(command);
+    // changing the name of one of the copy of the server simulating that its not available
+    system("mv ../server/root ../server/root1");
 
-    // printf("Operation MD Successful!!\n");
-    // displayLine();
+    // Triggering GET again: Note that only one of the directory is active now
+    printf("Test 7: Testing GET operation with just one replica of server available:\n");
+    printf("Note the server saying only Directory 1 is available\n");
+    displayLine();
 
-    // // PUT: smaller file TODO
+    sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    printCommandOutput(command);
 
-    // // PUT: large file
-    // printf("Test 4: Testing PUT operation LARGE FILE:\n");
-    // displayLine();
+    printf("Operation GET Successful!!\n");
+    displayLine();
 
-    // sprintf(command, "./fget PUT lorem/loremContent.txt bigFile.txt");
-    // system(command);
-    // // printCommandOutput(command);
+    // chnaging the name of the chnaged server space back to original, simulating that its now available.
+    system("mv ../server/root1 ../server/root");
 
-    // printf("Operation PUT Successful!!\n");
-    // displayLine();
+    // Triggering GET again: Note that both the replicas of the server are available now.
+    printf("Test 8: Testing GET operation with just the second replica of server back up & available:\n");
+    printf("Note the server displaying Cloning Complete.\n");
+    displayLine();
 
-    // // RM: remove newFolder
-    // printf("Test 5: Testing RM Command to remove a directory:\n");
-    // displayLine();
+    sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    printCommandOutput(command);
 
-    // sprintf(command, "./fget RM newFolder");
-    // printCommandOutput(command);
+    printf("Operation GET Successful!!\n");
+    displayLine();
 
-    // printf("Operation RM Successful!!\n");
-    // displayLine();
-
-    // // RM: remove file TODO
-    // printf("Test 6: Testing RM Command to remove a file:\n");
-    // displayLine();
-
-    // sprintf(command, "./fget RM filr.txt");
-    // printCommandOutput(command);
-
-    // printf("Operation RM Successful!!\n");
-    // displayLine();
-
-    // // Phase 2: Q6 - test cases demonstrates that mirrors work
-    // // How: rename folder for directory 1 to something different, trigger GET
-    // //      we will have active directory as Directory 2 now
-    // //      rename Directory 1 back to original (correct) name
-    // //      trigger GET command, and ensure "cloning complete" is found in result
-
-    // // changing the name of one of the copy of the server simulating that its not available
-    // system("mv ../server/root ../server/root1");
-
-    // // Triggering GET again: Note that only one of the directory is active now
-    // printf("Test 7: Testing GET operation with just one replica of server available:\n");
-    // printf("Note the server saying only Directory 1 is available\n");
-    // displayLine();
-
-    // sprintf(command, "./fget GET h5.txt f1/h2.txt");
-    // printCommandOutput(command);
-
-    // printf("Operation GET Successful!!\n");
-    // displayLine();
-
-    // // chnaging the name of the chnaged server space back to original, simulating that its now available.
-    // system("mv ../server/root1 ../server/root");
-
-    // // Triggering GET again: Note that both the replicas of the server are available now.
-    // printf("Test 8: Testing GET operation with just the second replica of server back up & available:\n");
-    // printf("Note the server displaying Cloning Complete.\n");
-    // displayLine();
-
-    // sprintf(command, "./fget GET h5.txt f1/h2.txt");
-    // printCommandOutput(command);
-
-    // printf("Operation GET Successful!!\n");
-    // displayLine();
+    // NOTE: to demo this part, we need to block 1 directory by running a really long GET command (use ide-install.dmg file)
 
     // Phase 3: Q7 - test cases demonstrate that multi-threading works
     // How: trigger reads in a for loop so we are sending more requests to the
