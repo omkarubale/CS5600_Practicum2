@@ -267,7 +267,7 @@ int init_createRootDirectory()
     printf("INIT: root directory 2 already exists.\n");
   }
 
-  if (!isRootDirectory1Init && !isRootDirectory1Init)
+  if (!isRootDirectory1Init && !isRootDirectory2Init)
   {
     printf("INIT ERROR: both directory 1 and directory 2 init failed\n");
     return -1;
