@@ -637,7 +637,6 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   }
 
   // we have a directory available, start prep to read
-  strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
   remote_file = fopen(actual_path, "r");
@@ -792,7 +791,6 @@ void command_info(int client_sock, char *remote_file_path)
   }
 
   // we have a directory available, start prep to read
-  strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
   printf("INFO: actual path: %s\n", actual_path);
@@ -886,7 +884,6 @@ void command_makeDirectory(int client_sock, char *folder_path)
     printf("MD: Directory 1 is acquired\n");
 
     strcpy(actual_path1, ROOT_DIRECTORY_1);
-    strcat(actual_path1, "/");
     strncat(actual_path1, folder_path, strlen(folder_path));
 
     printf("MD: actual path: %s\n", actual_path1);
@@ -899,7 +896,6 @@ void command_makeDirectory(int client_sock, char *folder_path)
     printf("MD: Directory 2 is acquired\n");
 
     strcpy(actual_path2, ROOT_DIRECTORY_2);
-    strcat(actual_path2, "/");
     strncat(actual_path2, folder_path, strlen(folder_path));
 
     printf("MD: actual path: %s\n", actual_path2);
@@ -993,7 +989,6 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
     printf("PUT: Directory 1 is acquired\n");
 
     strcpy(actual_path1, ROOT_DIRECTORY_1);
-    strcat(actual_path1, "/");
     strncat(actual_path1, remote_file_path, strlen(remote_file_path));
 
     remote_file1 = fopen(actual_path1, "w");
@@ -1008,7 +1003,6 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
     printf("PUT: Directory 2 is acquired\n");
 
     strcpy(actual_path2, ROOT_DIRECTORY_2);
-    strcat(actual_path2, "/");
     strncat(actual_path2, remote_file_path, strlen(remote_file_path));
 
     remote_file2 = fopen(actual_path2, "w");
@@ -1136,7 +1130,6 @@ void command_remove(int client_sock, char *path)
     printf("RM: Directory 1 is acquired\n");
 
     strcpy(actual_path1, ROOT_DIRECTORY_1);
-    strcat(actual_path1, "/");
     strncat(actual_path1, path, strlen(path));
 
     printf("RM: actual path: %s\n", actual_path1);
@@ -1149,7 +1142,6 @@ void command_remove(int client_sock, char *path)
     printf("RM: Directory 2 is acquired\n");
 
     strcpy(actual_path2, ROOT_DIRECTORY_2);
-    strcat(actual_path2, "/");
     strncat(actual_path2, path, strlen(path));
 
     printf("RM: actual path: %s\n", actual_path2);

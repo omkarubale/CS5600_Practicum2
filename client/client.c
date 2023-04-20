@@ -114,7 +114,6 @@ void command_get(char *remote_file_path, char *local_file_path)
   FILE *local_file;
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
-  strcat(actual_path, "/");
   strncat(actual_path, local_file_path, strlen(local_file_path));
 
   local_file = fopen(actual_path, "w");
@@ -251,7 +250,6 @@ void command_put(char *local_file_path, char *remote_file_path)
 
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
-  strcat(actual_path, "/");
   strncat(actual_path, local_file_path, strlen(local_file_path));
 
   FILE *local_file;
