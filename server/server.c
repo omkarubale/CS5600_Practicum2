@@ -276,6 +276,8 @@ int initServer()
 
 #pragma region Directory Management
 
+/// @brief This method tells whether the root directory 1 is initialzed.
+/// @return True if directory 1 is initialized.
 bool directory_isDirectory1Init()
 {
   struct stat st = {0};
@@ -337,6 +339,8 @@ bool directory_isDirectory1Init()
   }
 }
 
+/// @brief This method tells whether the root directory 2 is initialzed.
+/// @return True if directory 2 is initialized.
 bool directory_isDirectory2Init()
 {
   struct stat st = {0};
@@ -617,9 +621,6 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   printf("COMMAND: GET complete\n\n");
 }
 
-/// @brief
-/// @param remote_file_path
-
 /// @brief Gives the relevant information for a file.
 /// @param client_sock is the socket of the client which is requesting the information.
 /// @param remote_file_path is the path of the file whose information is requested.
@@ -756,10 +757,6 @@ void command_makeDirectory(int client_sock, char *folder_path)
   printf("COMMAND: MD complete\n\n");
 }
 
-/// @brief
-/// @param local_file_path
-/// @param remote_file_path
-
 /// @brief To create and store a replica of a local client file to server space.
 /// @param client_sock is the socket of the client that is requesting the command.
 /// @param local_file_path is the path of the local file.
@@ -771,20 +768,55 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
   pthread_mutex_lock(&command_mutex);
 
   // prepare the file to write into
-  FILE *remote_file;
-  char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY_1);
-  strcat(actual_path, "/");
-  strncat(actual_path, remote_file_path, strlen(remote_file_path));
+  FILE *remote_file1;
+  FILE *remote_file2;
 
-  remote_file = fopen(actual_path, "w");
+  char actual_path1[200];
+  char actual_path2[200];
+
+  if (directory_isDirectory1Init())
+  {
+    printf("GET: Directory 1 is available\n");
+    strcpy(actual_path1, ROOT_DIRECTORY_1);
+  }
+
+  if (directory_isDirectory2Init())
+  {
+    printf("GET: Directory 2 is available\n");
+    strcpy(actual_path2, ROOT_DIRECTORY_2);
+  }
+
+  if (!isRootDirectory1Init && !isRootDirectory2Init)
+  {
+    printf("GET ERROR: No Directory is available\n");
+    server_closeServerSocket();
+    exit(1);
+  }
+
+  strcat(actual_path1, "/");
+  strcat(actual_path2, "/");
+  strncat(actual_path1, remote_file_path, strlen(remote_file_path));
+  strncat(actual_path2, remote_file_path, strlen(remote_file_path));
+
+  printf("INFO: actual path: %s\n", actual_path1);
+  printf("INFO: actual path: %s\n", actual_path2);
+
+  if (isRootDirectory1Init)
+  {
+    remote_file1 = fopen(actual_path1, "w");
+  }
+
+  if (isRootDirectory2Init)
+  {
+    remote_file2 = fopen(actual_path2, "w");
+  }
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
   char client_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(client_message, 0, sizeof(client_message));
 
-  if (remote_file == NULL)
+  if ((isRootDirectory1Init && remote_file1 == NULL) || (isRootDirectory2Init && remote_file2 == NULL))
   {
     printf("PUT ERROR: File could not be opened. Please check whether the location exists.\n");
 
@@ -811,9 +843,16 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
         char *file_contents;
         file_contents = client_message + CODE_SIZE + CODE_PADDING;
 
-        printf("PUT: Writing to file: %s\n", file_contents);
-
-        fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file);
+        if (isRootDirectory1Init)
+        {
+          printf("PUT: Writing to file on directory 1: %s\n", file_contents);
+          fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file1);
+        }
+        if (isRootDirectory2Init)
+        {
+          printf("PUT: Writing to file on directory 2: %s\n", file_contents);
+          fwrite(file_contents, sizeof(char), strlen(file_contents), remote_file2);
+        }
 
         memset(response_message, 0, sizeof(response_message));
         strcat(response_message, "S:100 ");
@@ -845,7 +884,14 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
       }
     }
 
-    fclose(remote_file);
+    if (isRootDirectory1Init)
+    {
+      fclose(remote_file1);
+    }
+    if (isRootDirectory2Init)
+    {
+      fclose(remote_file2);
+    }
   }
 
   pthread_mutex_unlock(&command_mutex);
