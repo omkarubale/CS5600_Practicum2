@@ -1,7 +1,21 @@
+/*
+ * tetsing.c -- Testing file
+ */
+#define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <pthread.h>
 #include "../common/common.h"
+
+#define __USE_XOPEN_EXTENDED
 
 void printCommandOutput(char command[200])
 {
@@ -31,6 +45,15 @@ void printCommandOutput(char command[200])
     pclose(fp);
 }
 
+void *triggerCommandOnly(void *command_arg)
+{
+    char *command = ((char *)command_arg);
+    printf("Triggering command: %s \n", command);
+    system(command);
+    printf("Completed command: %s \n", command);
+    return NULL;
+}
+
 void displayLine()
 {
     printf("-----------------------------\n\n");
@@ -41,112 +64,112 @@ int main()
     char command[200];
     printf("----------Starting Testing-----------\n\n");
 
-    // GET : basic file
-    printf("Test 1: Testing GET operation:\n");
-    displayLine();
+    // // GET : basic file
+    // printf("Test 1: Testing GET operation:\n");
+    // displayLine();
 
-    sprintf(command, "./fget GET h3.txt f1/h2.txt");
-    printCommandOutput(command);
-
-    printf("Operation GET Successful!!\n");
-    displayLine();
-
-    // INFO: basic file
-    printf("Test 2: Testing INFO of a file:\n");
-    displayLine();
-
-    sprintf(command, "./fget INFO h3.txt");
-    printCommandOutput(command);
-
-    printf("Operation INFO Successful!!\n");
-    displayLine();
-
-    // INFO: folder
-    printf("Test 2.1: Testing INFO of a folder:\n");
-    displayLine();
-
-    sprintf(command, "./fget INFO ff");
-    printCommandOutput(command);
-
-    printf("Operation INFO Successful!!\n");
-    displayLine();
-
-    // MD: add newFolder
-    printf("Test 3: Testing MD Command to create a new directory:\n");
-    displayLine();
-
-    sprintf(command, "./fget MD newFolder");
-    printCommandOutput(command);
-
-    printf("Operation MD Successful!!\n");
-    displayLine();
-
-    // PUT: smaller file TODO
-
-    // PUT: large file
-    printf("Test 4: Testing PUT operation LARGE FILE:\n");
-    displayLine();
-
-    sprintf(command, "./fget PUT lorem/loremContent.txt bigFile.txt");
-    system(command);
+    // sprintf(command, "./fget GET h3.txt f1/h2.txt");
     // printCommandOutput(command);
 
-    printf("Operation PUT Successful!!\n");
-    displayLine();
+    // printf("Operation GET Successful!!\n");
+    // displayLine();
 
-    // RM: remove newFolder
-    printf("Test 5: Testing RM Command to remove a directory:\n");
-    displayLine();
+    // // INFO: basic file
+    // printf("Test 2: Testing INFO of a file:\n");
+    // displayLine();
 
-    sprintf(command, "./fget RM newFolder");
-    printCommandOutput(command);
+    // sprintf(command, "./fget INFO h3.txt");
+    // printCommandOutput(command);
 
-    printf("Operation RM Successful!!\n");
-    displayLine();
+    // printf("Operation INFO Successful!!\n");
+    // displayLine();
 
-    // RM: remove file TODO
-    printf("Test 6: Testing RM Command to remove a file:\n");
-    displayLine();
+    // // INFO: folder
+    // printf("Test 2.1: Testing INFO of a folder:\n");
+    // displayLine();
 
-    sprintf(command, "./fget RM filr.txt");
-    printCommandOutput(command);
+    // sprintf(command, "./fget INFO ff");
+    // printCommandOutput(command);
 
-    printf("Operation RM Successful!!\n");
-    displayLine();
+    // printf("Operation INFO Successful!!\n");
+    // displayLine();
 
-    // Phase 2: Q6 - test cases demonstrates that mirrors work
-    // How: rename folder for directory 1 to something different, trigger GET
-    //      we will have active directory as Directory 2 now
-    //      rename Directory 1 back to original (correct) name
-    //      trigger GET command, and ensure "cloning complete" is found in result
+    // // MD: add newFolder
+    // printf("Test 3: Testing MD Command to create a new directory:\n");
+    // displayLine();
 
-    // changing the name of one of the copy of the server simulating that its not available
-    system("mv ../server/root ../server/root1");
+    // sprintf(command, "./fget MD newFolder");
+    // printCommandOutput(command);
 
-    // Triggering GET again: Note that only one of the directory is active now
-    printf("Test 7: Testing GET operation with just one replica of server available:\n");
-    printf("Note the server saying only Directory 1 is available");
-    displayLine();
+    // printf("Operation MD Successful!!\n");
+    // displayLine();
 
-    sprintf(command, "./fget GET h5.txt f1/h2.txt");
-    printCommandOutput(command);
+    // // PUT: smaller file TODO
 
-    printf("Operation GET Successful!!\n");
-    displayLine();
+    // // PUT: large file
+    // printf("Test 4: Testing PUT operation LARGE FILE:\n");
+    // displayLine();
 
-    // chnaging the name of the chnaged server space back to original, simulating that its now available.
-    system("mv ../server/root1 ../server/root");
+    // sprintf(command, "./fget PUT lorem/loremContent.txt bigFile.txt");
+    // system(command);
+    // // printCommandOutput(command);
 
-    // Triggering GET again: Note that both the replicas of the server are available now.
-    printf("Test 8: Testing GET operation with just the second replica of server back up & available:\n");
-    printf("Note the server displaying Cloning Complete.");
-    displayLine();
+    // printf("Operation PUT Successful!!\n");
+    // displayLine();
 
-    sprintf(command, "./fget GET h5.txt f1/h2.txt");
-    printCommandOutput(command);
+    // // RM: remove newFolder
+    // printf("Test 5: Testing RM Command to remove a directory:\n");
+    // displayLine();
 
-    printf("Operation GET Successful!!\n");
-    displayLine();
+    // sprintf(command, "./fget RM newFolder");
+    // printCommandOutput(command);
+
+    // printf("Operation RM Successful!!\n");
+    // displayLine();
+
+    // // RM: remove file TODO
+    // printf("Test 6: Testing RM Command to remove a file:\n");
+    // displayLine();
+
+    // sprintf(command, "./fget RM filr.txt");
+    // printCommandOutput(command);
+
+    // printf("Operation RM Successful!!\n");
+    // displayLine();
+
+    // // Phase 2: Q6 - test cases demonstrates that mirrors work
+    // // How: rename folder for directory 1 to something different, trigger GET
+    // //      we will have active directory as Directory 2 now
+    // //      rename Directory 1 back to original (correct) name
+    // //      trigger GET command, and ensure "cloning complete" is found in result
+
+    // // changing the name of one of the copy of the server simulating that its not available
+    // system("mv ../server/root ../server/root1");
+
+    // // Triggering GET again: Note that only one of the directory is active now
+    // printf("Test 7: Testing GET operation with just one replica of server available:\n");
+    // printf("Note the server saying only Directory 1 is available\n");
+    // displayLine();
+
+    // sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    // printCommandOutput(command);
+
+    // printf("Operation GET Successful!!\n");
+    // displayLine();
+
+    // // chnaging the name of the chnaged server space back to original, simulating that its now available.
+    // system("mv ../server/root1 ../server/root");
+
+    // // Triggering GET again: Note that both the replicas of the server are available now.
+    // printf("Test 8: Testing GET operation with just the second replica of server back up & available:\n");
+    // printf("Note the server displaying Cloning Complete.\n");
+    // displayLine();
+
+    // sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    // printCommandOutput(command);
+
+    // printf("Operation GET Successful!!\n");
+    // displayLine();
 
     // Phase 3: Q7 - test cases demonstrate that multi-threading works
     // How: trigger reads in a for loop so we are sending more requests to the
@@ -156,14 +179,28 @@ int main()
     // Phase 4: Q8 - test cases demonstrate that distributed reads work
     // How: Can be same as Q7 testing if done well
 
-    printf("Test 9: Triggering multiple reads/requests to the server showing multithreading");
+    printf("Test 9: Triggering multiple reads/requests to the server showing multithreading\n");
     displayLine();
 
+    int thread_count = 20;
+
+    pthread_t threads_to_test[thread_count];
+    char parallel_command[thread_count][200];
+
     // tests failing
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < thread_count; i++)
     {
-        sprintf(command, "./fget GET bigFile.txt f3/%d.txt", i);
-        printCommandOutput(command);
+
+        sprintf(parallel_command[i], "./fget GET lorem/lorem2000.txt f3/%d.txt", i);
+        pthread_create(&threads_to_test[i], NULL, triggerCommandOnly, parallel_command[i]);
+        // printCommandOutput(command);
+    }
+
+    for (int i = 0; i < thread_count; i++)
+    {
+
+        pthread_join(threads_to_test[i], NULL);
+        // printCommandOutput(command);
     }
 
     printf("Distributed reads with multiprocessing tests done.");

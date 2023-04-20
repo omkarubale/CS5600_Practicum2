@@ -11,9 +11,11 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <libgen.h>
 #include "../common/common.h"
 
-#define ROOT_DIRECTORY "./root"
+#define ROOT_DIRECTORY "./root/"
 
 int socket_desc;
 struct sockaddr_in server_addr;
@@ -75,7 +77,7 @@ void client_connect()
 /// @param client_message represents the message to be sent.
 void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE])
 {
-  printf("SENDING TO SERVER: %s \n", client_message);
+  // printf("SENDING TO SERVER: %s \n", client_message);
 
   // Send the message to server:
   if (send(socket_desc, client_message, strlen(client_message), 0) < 0)
@@ -96,10 +98,30 @@ void client_recieveMessageFromServer(char *server_message)
     client_closeClientSocket();
   }
 
-  printf("RECIEVED FROM SERVER: %s \n", server_message);
+  // printf("RECIEVED FROM SERVER: %s \n", server_message);
 }
 
 #pragma endregion Communication
+
+#pragma region Directory Management
+
+/// @brief Checks the existence of a directory in the server space.
+/// @param path represents the directory path that needs to be examined for existence.
+/// @return true if the directory exists, false otherwise.
+bool directory_isDirectoryExists(const char *path)
+{
+  struct stat stats;
+
+  stat(path, &stats);
+
+  // Check for file existence
+  if (S_ISDIR(stats.st_mode))
+    return true;
+
+  return false;
+}
+
+#pragma endregion Directory Management
 
 #pragma region Commands
 
@@ -115,6 +137,7 @@ void command_get(char *remote_file_path, char *local_file_path)
   char actual_path[200];
   strcpy(actual_path, ROOT_DIRECTORY);
   strncat(actual_path, local_file_path, strlen(local_file_path));
+  printf("GET: actual path: %s \n", actual_path);
 
   local_file = fopen(actual_path, "w");
 
@@ -170,7 +193,7 @@ void command_get(char *remote_file_path, char *local_file_path)
           char *file_contents;
           file_contents = server_response + CODE_SIZE + CODE_PADDING;
 
-          printf("GET: Writing to file: %s\n", file_contents);
+          // printf("GET: Writing to file: %s\n", file_contents);
 
           fwrite(file_contents, sizeof(char), strlen(file_contents), local_file);
 

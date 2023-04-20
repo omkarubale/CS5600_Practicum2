@@ -515,7 +515,7 @@ bool directory_isDirectory2Available()
 /// @param server_message represents the server message.
 void server_sendMessageToClient(int client_sock, char *server_message)
 {
-  printf("SENDING TO CLIENT: %s\n", server_message);
+  // printf("SENDING TO CLIENT: %s\n", server_message);
   if (send(client_sock, server_message, strlen(server_message), 0) < 0)
   {
     printf("ERROR: Can't send\n");
@@ -535,7 +535,7 @@ void server_recieveMessageFromClient(int client_sock, char *client_message)
     server_closeServerSocket();
   }
 
-  printf("RECIEVED FROM CLIENT: %s\n", client_message);
+  // printf("RECIEVED FROM CLIENT: %s\n", client_message);
 }
 
 #pragma endregion Communication
@@ -594,8 +594,7 @@ int directory_removeDirectoryRecursively(char *path)
 
 /// @brief To receive a file from client to the server.
 /// @param remote_file_path represents the path in server space where the received file needs to be stored.
-/// @param local_file_path is the path of original file in client space.
-void command_get(int client_sock, char *remote_file_path, char *local_file_path)
+void command_get(int client_sock, char *remote_file_path)
 {
   printf("COMMAND: GET started\n");
 
@@ -690,7 +689,7 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
 
         if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE - 1, remote_file)) > 0)
         {
-          printf("BUFFER: %s \n", buffer);
+          // printf("BUFFER: %s \n", buffer);
           memset(response_message, 0, sizeof(response_message));
 
           strcat(response_message, "S:206 ");
@@ -968,9 +967,8 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
 /// @brief To create and store a replica of a local client file to server space.
 /// @param client_sock is the socket of the client that is requesting the command.
-/// @param local_file_path is the path of the local file.
 /// @param remote_file_path is the path in server where the replica needs to be saved.
-void command_put(int client_sock, char *local_file_path, char *remote_file_path)
+void command_put(int client_sock, char *remote_file_path)
 {
   printf("COMMAND: PUT started\n");
 
@@ -1368,7 +1366,7 @@ void *server_listenForCommand(void *client_sock_arg)
   // Redirect to correct command
   if (strcmp(args[0], "C:001") == 0)
   {
-    command_get(client_sock, args[1], args[2]);
+    command_get(client_sock, args[1]);
   }
   else if (strcmp(args[0], "C:002") == 0)
   {
@@ -1376,7 +1374,7 @@ void *server_listenForCommand(void *client_sock_arg)
   }
   else if (strcmp(args[0], "C:003") == 0)
   {
-    command_put(client_sock, args[1], args[2]);
+    command_put(client_sock, args[2]);
   }
   else if (strcmp(args[0], "C:004") == 0)
   {
