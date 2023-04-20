@@ -690,6 +690,7 @@ void command_get(int client_sock, char *remote_file_path)
         if ((bytes_read = fread(buffer, sizeof(char), SERVER_MESSAGE_SIZE - 1, remote_file)) > 0)
         {
           // printf("BUFFER: %s \n", buffer);
+          printf("GET: Continue\n");
           memset(response_message, 0, sizeof(response_message));
 
           strcat(response_message, "S:206 ");

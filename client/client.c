@@ -77,7 +77,7 @@ void client_connect()
 /// @param client_message represents the message to be sent.
 void client_sendMessageToServer(char client_message[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE])
 {
-  // printf("SENDING TO SERVER: %s \n", client_message);
+  printf("SENDING TO SERVER: %s \n", client_message);
 
   // Send the message to server:
   if (send(socket_desc, client_message, strlen(client_message), 0) < 0)
@@ -98,7 +98,7 @@ void client_recieveMessageFromServer(char *server_message)
     client_closeClientSocket();
   }
 
-  // printf("RECIEVED FROM SERVER: %s \n", server_message);
+  printf("RECIEVED FROM SERVER: %s \n", server_message);
 }
 
 #pragma endregion Communication
