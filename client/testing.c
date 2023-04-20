@@ -121,9 +121,33 @@ int main()
     //      rename Directory 1 back to original (correct) name
     //      trigger GET command, and ensure "cloning complete" is found in result
 
-    system("mv root root1");
+    // changing the name of one of the copy of the server simulating that its not available
+    system("mv ../server/root ../server/root1");
 
-    
+    // Triggering GET again: Note that only one of the directory is active now
+    printf("Test 7: Testing GET operation with just one replica of server available:\n");
+    printf("Note the server saying only Directory 1 is available");
+    displayLine();
+
+    sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    printCommandOutput(command);
+
+    printf("Operation GET Successful!!\n");
+    displayLine();
+
+    // chnaging the name of the chnaged server space back to original, simulating that its now available.
+    system("mv ../server/root1 ../server/root");
+
+    // Triggering GET again: Note that both the replicas of the server are available now.
+    printf("Test 8: Testing GET operation with just the second replica of server back up & available:\n");
+    printf("Note the server displaying Cloning Complete.");
+    displayLine();
+
+    sprintf(command, "./fget GET h5.txt f1/h2.txt");
+    printCommandOutput(command);
+
+    printf("Operation GET Successful!!\n");
+    displayLine();
 
     // Phase 3: Q7 - test cases demonstrate that multi-threading works
     // How: trigger reads in a for loop so we are sending more requests to the
@@ -132,6 +156,17 @@ int main()
 
     // Phase 4: Q8 - test cases demonstrate that distributed reads work
     // How: Can be same as Q7 testing if done well
+
+    printf("Test 9: Triggering multiple reads/requests to the server showing multithreading");
+    displayLine();
+
+    //tests failing
+    for ( int i = 0; i<20; i++) {
+        sprintf(command, "./fget GET bigFile.txt f3/%d.txt",i);
+        printCommandOutput(command);
+    }
+
+    printf("Distributed reads with multiprocessing tests done.");
 
     return 0;
 }
