@@ -503,16 +503,23 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   memset(response_message, 0, sizeof(response_message));
 
   char actual_path[200];
+  int targetDirectory = 0;
 
   if (directory_isDirectory1Init())
   {
     printf("GET: Directory 1 is available\n");
     strcpy(actual_path, ROOT_DIRECTORY_1);
+    targetDirectory = 1;
+
+    pthread_mutex_lock(&root_directory_1_mutex);
   }
   else if (directory_isDirectory2Init())
   {
     printf("GET: Directory 2 is available\n");
     strcpy(actual_path, ROOT_DIRECTORY_2);
+
+    targetDirectory = 2;
+    pthread_mutex_lock(&root_directory_2_mutex);
   }
   else
   {
@@ -616,6 +623,19 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   }
 
   fclose(remote_file);
+  if (targetDirectory == 1)
+  {
+    pthread_mutex_unlock(&root_directory_1_mutex);
+  }
+  else if (targetDirectory == 2)
+  {
+    pthread_mutex_unlock(&root_directory_2_mutex);
+  }
+  else
+  {
+    printf("GET ERROR: Unlocking directory mutex - No Directory is available\n");
+  }
+
   pthread_mutex_unlock(&command_mutex);
 
   printf("COMMAND: GET complete\n\n");
