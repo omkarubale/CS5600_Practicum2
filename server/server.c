@@ -26,6 +26,11 @@ struct sockaddr_in server_addr;
 
 pthread_mutex_t command_mutex;
 
+pthread_mutex_t root_directory_1_mutex;
+pthread_mutex_t root_directory_2_mutex;
+
+bool isRootDirectory1Init, isRootDirectory2Init;
+
 /// @brief Closes the server socket.
 void server_closeServerSocket()
 {
@@ -43,6 +48,56 @@ void server_closeClientSocket(int client_sock)
 {
   close(client_sock);
 }
+
+#pragma region Directory Cloning
+
+void directory_cloneDirectory2IntoDirectory1()
+{
+  char command[1000];
+  memset(command, 0, sizeof(command));
+
+  strcat(command, "cp -p -r ");
+  strcat(command, ROOT_DIRECTORY_2);
+  strcat(command, "*");
+  strcat(command, " ");
+  strcat(command, ROOT_DIRECTORY_1);
+
+  pthread_mutex_lock(&root_directory_1_mutex);
+  pthread_mutex_lock(&root_directory_2_mutex);
+
+  printf("DIRECTORY CLONING: command to be excuted for clone root directory 2 into root directory 1: %s \n", command);
+  printf("DIRECTORY CLONING: starting cloning root directory 2 into root directory 1\n");
+  system(command);
+
+  pthread_mutex_unlock(&root_directory_1_mutex);
+  pthread_mutex_unlock(&root_directory_2_mutex);
+  printf("DIRECTORY CLONING: cloning complete for root directory 2 into root directory 1\n");
+}
+
+void directory_cloneDirectory1IntoDirectory2()
+{
+  char command[1000];
+  memset(command, 0, sizeof(command));
+
+  strcat(command, "cp -p -r ");
+  strcat(command, ROOT_DIRECTORY_1);
+  strcat(command, "*");
+  strcat(command, " ");
+  strcat(command, ROOT_DIRECTORY_2);
+
+  pthread_mutex_lock(&root_directory_1_mutex);
+  pthread_mutex_lock(&root_directory_2_mutex);
+
+  printf("DIRECTORY CLONING: command to be excuted for clone root directory 1 into root directory 2: %s \n", command);
+  printf("DIRECTORY CLONING: starting cloning root directory 1 into root directory 2\n");
+  system(command);
+
+  pthread_mutex_unlock(&root_directory_1_mutex);
+  pthread_mutex_unlock(&root_directory_2_mutex);
+  printf("DIRECTORY CLONING: cloning complete for root directory 1 into root directory 2\n");
+}
+
+#pragma endregion Directory Cloning
 
 #pragma region Init
 
@@ -87,16 +142,99 @@ int init_bindServerSocket()
 /// @return 0 if successful, -1 otherwise.
 int init_createRootDirectory()
 {
-  struct stat st = {0};
+  struct stat st1 = {0};
+  struct stat st2 = {0};
 
-  if (stat(ROOT_DIRECTORY, &st) == -1)
+  bool isDirectory1Fresh = false;
+  bool isDirectory2Fresh = false;
+
+  // init mutex for directory 1
+  if (pthread_mutex_init(&root_directory_1_mutex, NULL) != 0)
+  {
+    printf("INIT ERROR: root directory 1 mutex init failed\n");
+    exit(1);
+  }
+
+  // init directory 1
+  if (stat(ROOT_DIRECTORY_1, &st1) == -1)
   {
     // created using S_IREAD, S_IWRITE, S_IEXEC (0400 | 0200 | 0100) permission flags
-    int res = mkdir(ROOT_DIRECTORY, 0700);
+    int res = mkdir(ROOT_DIRECTORY_1, 0700);
     if (res != 0)
     {
-      printf("ERROR: root directory creation failed\n");
-      return -1;
+      isRootDirectory1Init = false;
+      printf("INIT ERROR: root directory 1 creation failed\n");
+    }
+    else
+    {
+      isRootDirectory1Init = true;
+      isDirectory1Fresh = true;
+      printf("INIT: root directory 1 initialization successful\n");
+    }
+  }
+  else
+  {
+    isRootDirectory1Init = true;
+    isDirectory1Fresh = false;
+    printf("INIT: root directory 1 already exists.\n");
+  }
+
+  // init mutex for directory 2
+  if (pthread_mutex_init(&root_directory_2_mutex, NULL) != 0)
+  {
+    printf("INIT ERROR: root directory 2 mutex init failed\n");
+    exit(1);
+  }
+
+  // init directory 2
+  if (stat(ROOT_DIRECTORY_2, &st2) == -1)
+  {
+    // created using S_IREAD, S_IWRITE, S_IEXEC (0400 | 0200 | 0100) permission flags
+    int res = mkdir(ROOT_DIRECTORY_2, 0700);
+    if (res != 0)
+    {
+      isRootDirectory2Init = false;
+      printf("INIT ERROR: root directory 2 creation failed\n");
+    }
+    else
+    {
+      isRootDirectory2Init = true;
+      isDirectory2Fresh = true;
+      printf("INIT: root directory 2 initialization successful\n");
+    }
+  }
+  else
+  {
+    isRootDirectory2Init = true;
+    isDirectory2Fresh = false;
+    printf("INIT: root directory 2 already exists.\n");
+  }
+
+  if (!isRootDirectory1Init && !isRootDirectory1Init)
+  {
+    printf("INIT ERROR: both directory 1 and directory 2 init failed\n");
+    return -1;
+  }
+
+  if (isRootDirectory1Init && isRootDirectory2Init)
+  {
+    if (!isDirectory1Fresh && !isDirectory2Fresh)
+    {
+      printf("INIT: both directory 1 and directory 2 already exist\n");
+    }
+    else if (isDirectory1Fresh && isDirectory2Fresh)
+    {
+      printf("INIT: both directory 1 and directory 2 are fresh\n");
+    }
+    else if (!isDirectory1Fresh && isDirectory2Fresh)
+    {
+      printf("INIT: directory 2 is fresh, cloning directory 1 into directory 2\n");
+      directory_cloneDirectory1IntoDirectory2();
+    }
+    else if (isDirectory1Fresh && !isDirectory2Fresh)
+    {
+      printf("INIT: directory 1 is fresh, cloning directory 2 into directory 1\n");
+      directory_cloneDirectory2IntoDirectory1();
     }
   }
 
@@ -108,7 +246,7 @@ int init_createCommandMutex()
   if (pthread_mutex_init(&command_mutex, NULL) != 0)
   {
     printf("INIT ERROR: output file mutex init failed\n");
-    return -1;
+    exit(1);
   }
   return 0;
 }
@@ -136,6 +274,132 @@ int initServer()
 
 #pragma endregion Init
 
+#pragma region Directory Management
+
+bool directory_isDirectory1Init()
+{
+  struct stat st = {0};
+
+  if (isRootDirectory1Init)
+  {
+    // if directory 1 is marked as initialized, check whether it exists
+    if (stat(ROOT_DIRECTORY_1, &st) == 0)
+    {
+      // it exists and is available
+      printf("DIRECTORY: directory 1 is available\n");
+      return true;
+    }
+    else
+    {
+      // directory was marked initialized but isn't available anymore
+      isRootDirectory1Init = false;
+
+      printf("DIRECTORY: directory 1 was marked initialized but isn't available anymore\n");
+      return false;
+    }
+  }
+  else
+  {
+    // directory was marked as not initialized, check whether it exists
+    if (stat(ROOT_DIRECTORY_1, &st) == 0)
+    {
+      // it exists, need to be initialized again
+      printf("DIRECTORY: Directory 1 is available now, cloning from directory 2\n");
+
+      struct stat st2 = {0};
+
+      if (isRootDirectory2Init && stat(ROOT_DIRECTORY_2, &st2) == 0)
+      {
+        // clone directory 2 into directory 1
+        directory_cloneDirectory2IntoDirectory1();
+
+        isRootDirectory1Init = true;
+
+        return true;
+      }
+      else
+      {
+        // both directories are not available, and we cannot serve any requests
+        printf("DIRECTORY ERROR: root directory 1 and root directory 2 both are unavailable\n");
+        exit(1);
+      }
+
+      isRootDirectory1Init = false;
+
+      return true;
+    }
+    else
+    {
+      // directory doesn't exist and is not available
+      printf("DIRECTORY: directory 1 is not available\n");
+      return false;
+    }
+  }
+}
+
+bool directory_isDirectory2Init()
+{
+  struct stat st = {0};
+
+  if (isRootDirectory2Init)
+  {
+    // if directory 2 is marked as initialized, check whether it exists
+    if (stat(ROOT_DIRECTORY_2, &st) == 0)
+    {
+      // it exists and is available
+      printf("DIRECTORY: directory 2 is available\n");
+      return true;
+    }
+    else
+    {
+      // directory was marked initialized but isn't available anymore
+      isRootDirectory2Init = false;
+
+      printf("DIRECTORY: directory 2 was marked initialized but isn't available anymore\n");
+      return false;
+    }
+  }
+  else
+  {
+    // directory was marked as not initialized, check whether it exists
+    if (stat(ROOT_DIRECTORY_2, &st) == 0)
+    {
+      // it exists, need to be initialized again
+      printf("DIRECTORY: Directory 2 is available now, cloning from directory 1\n");
+
+      struct stat st1 = {0};
+
+      if (isRootDirectory2Init && stat(ROOT_DIRECTORY_1, &st1) == 0)
+      {
+        // clone directory 1 into directory 2
+        directory_cloneDirectory1IntoDirectory2();
+
+        isRootDirectory2Init = true;
+
+        return true;
+      }
+      else
+      {
+        // both directories are not available, and we cannot serve any requests
+        printf("DIRECTORY ERROR: root directory 2 and root directory 1 both are unavailable\n");
+        exit(1);
+      }
+
+      isRootDirectory2Init = false;
+
+      return true;
+    }
+    else
+    {
+      // directory doesn't exist and is not available
+      printf("DIRECTORY: directory 2 is not available\n");
+      return false;
+    }
+  }
+}
+
+#pragma endregion Directory Management
+
 #pragma region Communication
 
 /// @brief Sends a message to the client.
@@ -150,9 +414,6 @@ void server_sendMessageToClient(int client_sock, char *server_message)
     server_closeServerSocket();
   }
 }
-
-/// @brief
-/// @param client_message
 
 /// @brief Receives a message from the client.
 /// @param client_sock is the socket of the client the message is to be received from.
@@ -238,7 +499,24 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   memset(response_message, 0, sizeof(response_message));
 
   char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY);
+
+  if (directory_isDirectory1Init())
+  {
+    printf("GET: Directory 1 is available\n");
+    strcpy(actual_path, ROOT_DIRECTORY_1);
+  }
+  else if (directory_isDirectory2Init())
+  {
+    printf("GET: Directory 2 is available\n");
+    strcpy(actual_path, ROOT_DIRECTORY_2);
+  }
+  else
+  {
+    printf("GET ERROR: No Directory is available\n");
+    server_closeServerSocket();
+    exit(1);
+  }
+
   strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
@@ -352,7 +630,7 @@ void command_info(int client_sock, char *remote_file_path)
   pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY);
+  strcpy(actual_path, ROOT_DIRECTORY_1);
   strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
@@ -426,7 +704,7 @@ void command_makeDirectory(int client_sock, char *folder_path)
   pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY);
+  strcpy(actual_path, ROOT_DIRECTORY_1);
   strcat(actual_path, "/");
   strncat(actual_path, folder_path, strlen(folder_path));
 
@@ -495,7 +773,7 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
   // prepare the file to write into
   FILE *remote_file;
   char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY);
+  strcpy(actual_path, ROOT_DIRECTORY_1);
   strcat(actual_path, "/");
   strncat(actual_path, remote_file_path, strlen(remote_file_path));
 
@@ -585,7 +863,7 @@ void command_remove(int client_sock, char *path)
   pthread_mutex_lock(&command_mutex);
 
   char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY);
+  strcpy(actual_path, ROOT_DIRECTORY_1);
   strcat(actual_path, "/");
   strncat(actual_path, path, strlen(path));
 
