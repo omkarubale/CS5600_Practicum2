@@ -114,7 +114,6 @@ int main()
     printf("Operation RM Successful!!\n");
     displayLine();
 
-
     // Phase 2: Q6 - test cases demonstrates that mirrors work
     // How: rename folder for directory 1 to something different, trigger GET
     //      we will have active directory as Directory 2 now
@@ -160,9 +159,10 @@ int main()
     printf("Test 9: Triggering multiple reads/requests to the server showing multithreading");
     displayLine();
 
-    //tests failing
-    for ( int i = 0; i<20; i++) {
-        sprintf(command, "./fget GET bigFile.txt f3/%d.txt",i);
+    // tests failing
+    for (int i = 0; i < 20; i++)
+    {
+        sprintf(command, "./fget GET bigFile.txt f3/%d.txt", i);
         printCommandOutput(command);
     }
 
