@@ -502,6 +502,7 @@ void command_get(int client_sock, char *remote_file_path, char *local_file_path)
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
 
+  // setup available directories and respective target file paths
   char actual_path[200];
   int targetDirectory = 0;
 
@@ -650,12 +651,13 @@ void command_info(int client_sock, char *remote_file_path)
 
   pthread_mutex_lock(&command_mutex);
 
+  // setup available directories and respective target file paths
   char actual_path[200];
   int targetDirectory = 0;
 
   if (directory_isDirectory1Init())
   {
-    printf("GET: Directory 1 is available\n");
+    printf("INFO: Directory 1 is available\n");
     strcpy(actual_path, ROOT_DIRECTORY_1);
     targetDirectory = 1;
 
@@ -663,7 +665,7 @@ void command_info(int client_sock, char *remote_file_path)
   }
   else if (directory_isDirectory2Init())
   {
-    printf("GET: Directory 2 is available\n");
+    printf("INFO: Directory 2 is available\n");
     strcpy(actual_path, ROOT_DIRECTORY_2);
 
     targetDirectory = 2;
@@ -671,7 +673,7 @@ void command_info(int client_sock, char *remote_file_path)
   }
   else
   {
-    printf("GET ERROR: No Directory is available\n");
+    printf("INFO ERROR: No Directory is available\n");
     server_closeServerSocket();
     exit(1);
   }
@@ -715,9 +717,7 @@ void command_info(int client_sock, char *remote_file_path)
     {
       printf("INFO: Directory/File Information Retrieval successful\n");
 
-      printf("TEST: %s", response_message);
       strcat(response_message, "S:200 Information Retrieval successful\n");
-      printf("TEST2: %s", response_message);
       char temp[2000];
       memset(temp, '\0', sizeof(temp));
 
@@ -744,7 +744,7 @@ void command_info(int client_sock, char *remote_file_path)
   }
   else
   {
-    printf("GET ERROR: Unlocking directory mutex - No Directory is available\n");
+    printf("INFO ERROR: Unlocking directory mutex - No Directory is available\n");
   }
 
   pthread_mutex_unlock(&command_mutex);
@@ -761,12 +761,13 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
   pthread_mutex_lock(&command_mutex);
 
+  // setup available directories and respective target file paths
   char actual_path1[200];
   char actual_path2[200];
 
   if (directory_isDirectory1Init())
   {
-    printf("GET: Directory 1 is available\n");
+    printf("MD: Directory 1 is available\n");
 
     strcpy(actual_path1, ROOT_DIRECTORY_1);
     strcat(actual_path1, "/");
@@ -774,12 +775,12 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
     pthread_mutex_lock(&root_directory_1_mutex);
 
-    printf("INFO: actual path: %s\n", actual_path1);
+    printf("MD: actual path: %s\n", actual_path1);
   }
 
   if (directory_isDirectory2Init())
   {
-    printf("GET: Directory 2 is available\n");
+    printf("MD: Directory 2 is available\n");
 
     strcpy(actual_path2, ROOT_DIRECTORY_2);
     strcat(actual_path2, "/");
@@ -787,12 +788,12 @@ void command_makeDirectory(int client_sock, char *folder_path)
 
     pthread_mutex_lock(&root_directory_2_mutex);
 
-    printf("INFO: actual path: %s\n", actual_path2);
+    printf("MD: actual path: %s\n", actual_path2);
   }
 
   if (!isRootDirectory1Init && !isRootDirectory2Init)
   {
-    printf("GET ERROR: No Directory is available\n");
+    printf("MD ERROR: No Directory is available\n");
     server_closeServerSocket();
     exit(1);
   }
@@ -864,7 +865,7 @@ void command_put(int client_sock, char *local_file_path, char *remote_file_path)
 
   pthread_mutex_lock(&command_mutex);
 
-  // prepare the file to write into
+  // setup available directories and respective target file paths
   FILE *remote_file1;
   FILE *remote_file2;
 
@@ -1011,19 +1012,51 @@ void command_remove(int client_sock, char *path)
 
   pthread_mutex_lock(&command_mutex);
 
-  char actual_path[200];
-  strcpy(actual_path, ROOT_DIRECTORY_1);
-  strcat(actual_path, "/");
-  strncat(actual_path, path, strlen(path));
+  // setup available directories and respective target file paths
+  char actual_path1[200];
+  char actual_path2[200];
 
-  printf("RM: actual path: %s\n", actual_path);
+  if (directory_isDirectory1Init())
+  {
+    printf("RM: Directory 1 is available\n");
+
+    strcpy(actual_path1, ROOT_DIRECTORY_1);
+    strcat(actual_path1, "/");
+    strncat(actual_path1, path, strlen(path));
+
+    pthread_mutex_lock(&root_directory_1_mutex);
+
+    printf("RM: actual path: %s\n", actual_path1);
+  }
+
+  if (directory_isDirectory2Init())
+  {
+    printf("RM: Directory 2 is available\n");
+
+    strcpy(actual_path2, ROOT_DIRECTORY_2);
+    strcat(actual_path2, "/");
+    strncat(actual_path2, path, strlen(path));
+
+    pthread_mutex_lock(&root_directory_2_mutex);
+
+    printf("RM: actual path: %s\n", actual_path2);
+  }
+
+  if (!isRootDirectory1Init && !isRootDirectory2Init)
+  {
+    printf("RM ERROR: No Directory is available\n");
+    server_closeServerSocket();
+    exit(1);
+  }
 
   char response_message[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
   memset(response_message, 0, sizeof(response_message));
 
-  struct stat sb;
+  struct stat sb1;
+  struct stat sb2;
 
-  if (stat(actual_path, &sb) == -1)
+  if ((isRootDirectory1Init && stat(actual_path1, &sb1) == -1) ||
+      (isRootDirectory2Init && stat(actual_path2, &sb2) == -1))
   {
     printf("RM ERROR: Directory/File Not Found\n");
     perror("stat");
@@ -1036,14 +1069,15 @@ void command_remove(int client_sock, char *path)
   else
   {
 
-    if (S_ISREG(sb.st_mode))
+    if (S_ISREG(sb1.st_mode) && S_ISREG(sb2.st_mode))
     {
       // Path is a regular file
-      int res = remove(actual_path);
+      int res1 = remove(actual_path1);
+      int res2 = remove(actual_path2);
 
-      if (res != 0)
+      if (res1 != 0 || res2 != 0)
       {
-        // creation of directory failed
+        // removal of file failed
         printf("RM ERROR: File Removal failed\n");
         perror("remove");
         strcat(response_message, "E:406 ");
@@ -1053,7 +1087,7 @@ void command_remove(int client_sock, char *path)
       }
       else
       {
-        // creation of directory successful
+        // removal of file successful
         printf("RM: File Removal successful\n");
 
         strcat(response_message, "S:200 ");
@@ -1062,14 +1096,15 @@ void command_remove(int client_sock, char *path)
         server_sendMessageToClient(client_sock, response_message);
       }
     }
-    else if (S_ISDIR(sb.st_mode))
+    else if (S_ISDIR(sb1.st_mode) && S_ISDIR(sb2.st_mode))
     {
       // Path is a directory
-      int res = rmrf(actual_path);
+      int res1 = rmrf(actual_path1);
+      int res2 = rmrf(actual_path2);
 
-      if (res != 0)
+      if (res1 != 0 || res2 != 0)
       {
-        // creation of directory failed
+        // removal of directory failed
         printf("RM ERROR: Directory Removal failed\n");
         perror("remove");
         strcat(response_message, "E:406 ");
@@ -1079,7 +1114,7 @@ void command_remove(int client_sock, char *path)
       }
       else
       {
-        // creation of directory successful
+        // removal of directory successful
         printf("RM: Directory Removal successful\n");
 
         strcat(response_message, "S:200 ");
@@ -1097,6 +1132,15 @@ void command_remove(int client_sock, char *path)
 
       server_sendMessageToClient(client_sock, response_message);
     }
+  }
+
+  if (isRootDirectory1Init)
+  {
+    pthread_mutex_unlock(&root_directory_1_mutex);
+  }
+  if (isRootDirectory2Init)
+  {
+    pthread_mutex_unlock(&root_directory_2_mutex);
   }
 
   pthread_mutex_unlock(&command_mutex);
