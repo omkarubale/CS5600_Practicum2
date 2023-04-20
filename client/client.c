@@ -156,9 +156,6 @@ void command_get(char *remote_file_path, char *local_file_path)
       client_sendMessageToServer(client_message);
 
       // Receive file data from server and write it to local file
-      char buffer[CODE_SIZE + CODE_PADDING + SERVER_MESSAGE_SIZE];
-      int bytes_received;
-
       // get first block from server
       memset(server_response, 0, sizeof(server_response));
       client_recieveMessageFromServer(server_response);
@@ -289,7 +286,6 @@ void command_put(char *local_file_path, char *remote_file_path)
       printf("PUT: Server hinted at accepting file contents.\n");
       char buffer[CODE_SIZE + CODE_PADDING + CLIENT_MESSAGE_SIZE - 1];
       int bytes_read;
-      int bytesReadSoFar = 0;
 
       while (true)
       {
@@ -301,8 +297,6 @@ void command_put(char *local_file_path, char *remote_file_path)
 
         if ((bytes_read = fread(buffer, sizeof(char), CLIENT_MESSAGE_SIZE - 1, local_file)) > 0)
         {
-          bytesReadSoFar += bytes_read;
-
           printf("BUFFER: %s \n", buffer);
 
           memset(client_message, 0, sizeof(client_message));
@@ -413,7 +407,7 @@ void command_remove(char *path)
 #pragma endregion Commands
 
 /// @brief The communication between our server and client is via well defined protocols. This method acts as a
-///         gateway for interaction and validation of requested commands. 
+///         gateway for interaction and validation of requested commands.
 /// @param argsCount represents the no. of arguments in the command.
 /// @param argv represents the arguments in the command.
 void client_parseCommand(int argsCount, char **argv)
