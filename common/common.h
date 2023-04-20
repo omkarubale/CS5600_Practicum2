@@ -32,7 +32,7 @@
 
 // client config
 #define CLIENT_MESSAGE_SIZE 2000
-#define CLIENT_COMMAND_SIZE 200
+#define CLIENT_COMMAND_SIZE 1000
 
 #pragma endregion Config
 
