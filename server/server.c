@@ -110,7 +110,7 @@ void directory_releaseDirectory2()
 
 #pragma region Directory Cloning
 
-/// @brief Clones Server Copy 2 to Server Copy 1. 
+/// @brief Clones Server Copy 2 to Server Copy 1.
 void directory_cloneDirectory2IntoDirectory1()
 {
   char command[1000];
@@ -134,7 +134,7 @@ void directory_cloneDirectory2IntoDirectory1()
   printf("DIRECTORY CLONING: cloning complete for root directory 2 into root directory 1\n");
 }
 
-/// @brief Clones Server Copy 1 to Server Copy 2. 
+/// @brief Clones Server Copy 1 to Server Copy 2.
 void directory_cloneDirectory1IntoDirectory2()
 {
   char command[1000];
@@ -589,10 +589,10 @@ bool directory_isFileExists(const char *filename)
 
 /// @brief Unlinks and removes a file.
 /// @param fpath represents the path of file/directory.
-/// @param sb 
-/// @param typeflag 
-/// @param ftwbuf 
-/// @return 
+/// @param sb buffer for stat command inside nftw command.
+/// @param typeflag type for nftw command.
+/// @param ftwbuf buffer for nftw command.
+/// @return 0 if successful.
 int directory_unlinkFile(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
 {
   int rv = remove(fpath);
@@ -1420,7 +1420,7 @@ void *server_listenForCommand(void *client_sock_arg)
 }
 
 /// @brief Initialises the server and makes connections to the incoming clients.
-/// @param  represents the paramaters passes when the program is run. Here in our case, its none/void. 
+/// @param  represents the paramaters passes when the program is run. Here in our case, its none/void.
 /// @return 0 when the server terminates.
 int main(void)
 {
