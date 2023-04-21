@@ -52,6 +52,8 @@ void server_closeClientSocket(int client_sock)
 
 #pragma region Directory Availability
 
+/// @brief Chnages the availability of the Copy 1 of the server.
+/// @param availability represents the availability for the copy.
 void directory_changeDirectory1Availability(bool availability)
 {
   pthread_mutex_lock(&root_directory_1_availability_mutex);
@@ -61,6 +63,8 @@ void directory_changeDirectory1Availability(bool availability)
   pthread_mutex_unlock(&root_directory_1_availability_mutex);
 }
 
+/// @brief Chnages the availability of the Copy 1 of the server.
+/// @param availability represents the availability for the copy.
 void directory_changeDirectory2Availability(bool availability)
 {
   pthread_mutex_lock(&root_directory_2_availability_mutex);
@@ -70,6 +74,7 @@ void directory_changeDirectory2Availability(bool availability)
   pthread_mutex_unlock(&root_directory_2_availability_mutex);
 }
 
+/// @brief Acquires mutex/control on Copy 1 of the server.
 void directory_acquireDirectory1()
 {
   pthread_mutex_lock(&root_directory_1_mutex);
@@ -77,6 +82,7 @@ void directory_acquireDirectory1()
   directory_changeDirectory1Availability(false);
 }
 
+/// @brief Releases mutex/control on Copy 1 of the server.
 void directory_releaseDirectory1()
 {
   directory_changeDirectory1Availability(true);
@@ -84,6 +90,7 @@ void directory_releaseDirectory1()
   pthread_mutex_unlock(&root_directory_1_mutex);
 }
 
+/// @brief Acquires mutex/control on Copy 2 of the server.
 void directory_acquireDirectory2()
 {
   pthread_mutex_lock(&root_directory_2_mutex);
@@ -91,6 +98,7 @@ void directory_acquireDirectory2()
   directory_changeDirectory2Availability(false);
 }
 
+/// @brief Releases mutex/control on Copy 2 of the server.
 void directory_releaseDirectory2()
 {
   directory_changeDirectory2Availability(true);
@@ -102,6 +110,7 @@ void directory_releaseDirectory2()
 
 #pragma region Directory Cloning
 
+/// @brief Clones Server Copy 2 to Server Copy 1. 
 void directory_cloneDirectory2IntoDirectory1()
 {
   char command[1000];
@@ -125,6 +134,7 @@ void directory_cloneDirectory2IntoDirectory1()
   printf("DIRECTORY CLONING: cloning complete for root directory 2 into root directory 1\n");
 }
 
+/// @brief Clones Server Copy 1 to Server Copy 2. 
 void directory_cloneDirectory1IntoDirectory2()
 {
   char command[1000];
@@ -448,6 +458,8 @@ bool directory_isDirectory2Init()
   }
 }
 
+/// @brief This method tells whether the root directory 1 is initialzed.
+/// @return True if directory 1 is initialized.
 bool directory_isDirectory1Available()
 {
   bool res;
@@ -477,6 +489,8 @@ bool directory_isDirectory1Available()
   }
 }
 
+/// @brief This method tells whether the root directory 2 is available.
+/// @return True if directory 2 is available.
 bool directory_isDirectory2Available()
 {
   bool res;
@@ -573,6 +587,12 @@ bool directory_isFileExists(const char *filename)
   return is_exist;
 }
 
+/// @brief Unlinks and removes a file.
+/// @param fpath represents the path of file/directory.
+/// @param sb 
+/// @param typeflag 
+/// @param ftwbuf 
+/// @return 
 int directory_unlinkFile(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
 {
   int rv = remove(fpath);
@@ -583,6 +603,9 @@ int directory_unlinkFile(const char *fpath, const struct stat *sb, int typeflag,
   return rv;
 }
 
+/// @brief Removes a directory recursively.
+/// @param path is the path of the directory to be removed.
+/// @return 0 if successful.
 int directory_removeDirectoryRecursively(char *path)
 {
   return nftw(path, directory_unlinkFile, 64, FTW_DEPTH | FTW_PHYS);
@@ -1396,6 +1419,9 @@ void *server_listenForCommand(void *client_sock_arg)
   return NULL;
 }
 
+/// @brief Initialises the server and makes connections to the incoming clients.
+/// @param  represents the paramaters passes when the program is run. Here in our case, its none/void. 
+/// @return 0 when the server terminates.
 int main(void)
 {
   int status;

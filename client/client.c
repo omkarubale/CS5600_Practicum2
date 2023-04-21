@@ -526,6 +526,10 @@ void client_parseCommand(int argsCount, char **argv)
   }
 }
 
+/// @brief Gateway for client to make a request to server by passing some arguments. 
+/// @param argc represents no of arguments passes.
+/// @param argv represents the arguments passes.
+/// @return 0 when the client terminates.
 int main(int argc, char **argv)
 {
   if (argc > 4)
